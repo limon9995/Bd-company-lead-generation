@@ -28,7 +28,7 @@ Then in the admin panel: **Settings** → add keys → press **Test** on each gr
 Telegram chat ID: send `/start` to your bot, then Settings → Telegram → **Detect chat ID**, or run
 `python scripts/get_telegram_chat_id.py --token <BOT_TOKEN>` (standard library only, runs anywhere).
 
-Full step-by-step (API keys, VPS, HTTPS): [docs/setup.md](docs/setup.md) · How it works: [docs/architecture.md](docs/architecture.md)
+Full step-by-step (API keys, VPS, HTTPS): [docs/setup.md](docs/setup.md) · How it works: [docs/architecture.md](docs/architecture.md) (visual version: docs/system-design.html)
 · Client proposal: [docs/proposal.md](docs/proposal.md)
 
 ## Local development

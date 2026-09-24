@@ -1,0 +1,392 @@
+<title>BD Lead Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#f4f7f5; --surface:#ffffff; --ink:#16201b; --muted:#56665e; --line:#d9e2dd;
+  --accent:#0f6b4f; --accent-soft:#e2f1ea; --amber:#9a5b07; --amber-soft:#fcf1dc;
+  --red:#a8321f; --red-soft:#fbe7e3; --node:#f7faf8; --ext:#eef3f1;
+  --display:"Instrument Sans","Segoe UI",system-ui,sans-serif;
+  --body:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  color-scheme:dark;--bg:#0e1411;--surface:#151d19;--ink:#e2eae6;--muted:#9aaba3;--line:#27332e;
+  --accent:#4cc596;--accent-soft:#16302a;--amber:#f0b54a;--amber-soft:#342812;--red:#f08a78;--red-soft:#3a1d18;
+  --node:#1a2420;--ext:#131a17;}}
+:root[data-theme="dark"]{
+  color-scheme:dark;--bg:#0e1411;--surface:#151d19;--ink:#e2eae6;--muted:#9aaba3;--line:#27332e;
+  --accent:#4cc596;--accent-soft:#16302a;--amber:#f0b54a;--amber-soft:#342812;--red:#f08a78;--red-soft:#3a1d18;
+  --node:#1a2420;--ext:#131a17;}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:15.5px/1.62 var(--body);padding-inline:16px;padding-block:0 64px}
+.wrap{max-width:1120px;margin:0 auto;display:grid;grid-template-columns:200px minmax(0,1fr);gap:48px}
+@media (max-width:900px){.wrap{grid-template-columns:minmax(0,1fr);gap:0}.toc{display:none}}
+.toc{position:sticky;top:env(safe-area-inset-top,0px);align-self:start;padding-top:40px;font-size:13px}
+.toc b{display:block;font:600 11px/1 var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
+.toc a{display:block;color:var(--muted);text-decoration:none;padding:4px 0 4px 10px;border-left:2px solid var(--line)}
+.toc a:hover,.toc a:focus-visible{color:var(--accent);border-left-color:var(--accent);outline:none}
+main{min-width:0}
+header{padding:40px 0 28px;border-bottom:1px solid var(--line);margin-bottom:8px}
+.eyebrow{font:600 12px/1 var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+h1{font:700 clamp(30px,5vw,44px)/1.08 var(--display);margin:12px 0 14px;text-wrap:balance;letter-spacing:-.01em}
+.lede{font-size:17px;color:var(--muted);max-width:64ch;margin:0}
+.meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+.chip{font:500 12px/1 var(--mono);padding:6px 9px;border-radius:6px;background:var(--surface);border:1px solid var(--line);color:var(--muted)}
+section{padding-top:40px;scroll-margin-top:12px}
+h2{font:600 23px/1.2 var(--display);margin:0 0 6px;text-wrap:balance}
+h3{font:600 16px/1.3 var(--display);margin:22px 0 6px}
+p{max-width:68ch;margin:8px 0}
+.sub{color:var(--muted);margin-top:0}
+code,.mono{font-family:var(--mono);font-size:.88em}
+code{background:var(--accent-soft);padding:1px 5px;border-radius:4px}
+.figure{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;margin:16px 0;overflow-x:auto}
+.figure svg{display:block;min-width:760px;width:100%;height:auto}
+.cap{font-size:12.5px;color:var(--muted);margin-top:10px}
+svg text{font-family:var(--body);fill:var(--ink)}
+svg .t-s{font-size:11px;fill:var(--muted)}
+svg .t-h{font-family:var(--display);font-weight:600;font-size:13.5px}
+svg .t-m{font-family:var(--mono);font-size:10.5px;fill:var(--muted)}
+svg .box{fill:var(--node);stroke:var(--line);stroke-width:1.2}
+svg .box-a{fill:var(--accent-soft);stroke:var(--accent);stroke-width:1.2}
+svg .box-x{fill:var(--ext);stroke:var(--line);stroke-width:1.2;stroke-dasharray:4 3}
+svg .zone{fill:none;stroke:var(--accent);stroke-width:1;stroke-dasharray:2 4;opacity:.7}
+svg .ln{stroke:var(--muted);stroke-width:1.3;fill:none}
+svg .ln-a{stroke:var(--accent);stroke-width:1.6;fill:none}
+svg .ah{fill:var(--muted)} svg .ah-a{fill:var(--accent)}
+.table{overflow-x:auto;margin:14px 0;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+th{font:600 11.5px/1.2 var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);background:var(--node)}
+td.num{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.lvl{display:inline-block;font:600 11.5px/1 var(--display);padding:4px 8px;border-radius:99px}
+.hi{background:var(--accent-soft);color:var(--accent)} .md{background:var(--amber-soft);color:var(--amber)} .lo{background:var(--red-soft);color:var(--red)}
+.stages{display:grid;gap:0;margin:16px 0;border:1px solid var(--line);border-radius:10px;background:var(--surface);overflow:hidden}
+.stage{display:grid;grid-template-columns:170px minmax(0,1fr);gap:18px;padding:16px 18px;border-bottom:1px solid var(--line)}
+.stage:last-child{border-bottom:0}
+@media (max-width:620px){.stage{grid-template-columns:minmax(0,1fr);gap:4px}}
+.stage .k{font:600 13px/1.3 var(--mono);color:var(--accent)}
+.stage .k span{display:block;font:400 12px/1.4 var(--body);color:var(--muted);margin-top:4px}
+.stage p{margin:0}
+.stage ul{margin:6px 0 0;padding-left:18px}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin:14px 0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px}
+.panel h3{margin-top:0}
+.panel ul{margin:6px 0 0;padding-left:18px}
+.score{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.score div{display:grid;grid-template-columns:52px minmax(0,1fr);gap:10px;padding:6px 0;border-bottom:1px dashed var(--line)}
+.score div:last-child{border-bottom:0}
+.plus{color:var(--accent);font-weight:500}.minus{color:var(--red);font-weight:500}
+.note{background:var(--amber-soft);color:var(--ink);border-radius:10px;padding:14px 16px;margin:14px 0;max-width:72ch}
+.note b{color:var(--amber)}
+pre.mermaid{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;margin:16px 0}
+footer{margin-top:48px;padding-top:18px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}
+</style>
+
+<div class="wrap">
+<nav class="toc" aria-label="Contents">
+  <b>Contents</b>
+  <a href="#overview">Overview</a>
+  <a href="#architecture">Architecture</a>
+  <a href="#pipeline">Pipeline</a>
+  <a href="#sequence">Run sequence</a>
+  <a href="#accuracy">Accuracy model</a>
+  <a href="#data">Data model</a>
+  <a href="#email">Email rules</a>
+  <a href="#reliability">Reliability</a>
+  <a href="#security">Security & compliance</a>
+  <a href="#deploy">Deployment & cost</a>
+  <a href="#limits">Known limits</a>
+</nav>
+
+<main>
+<header>
+  <div class="eyebrow">System design · v1</div>
+  <h1>BD Lead Engine</h1>
+  <p class="lede">A self-hosted system that finds Bangladeshi companies in a chosen industry, identifies the person who decides, stores the lead in a CRM with its evidence, alerts the team on Telegram and sends approved, scheduled emails.</p>
+  <div class="meta">
+    <span class="chip">Python 3.11 · FastAPI</span><span class="chip">PostgreSQL 16</span><span class="chip">Playwright / Chromium</span>
+    <span class="chip">Google Places API (New)</span><span class="chip">Gemini API</span><span class="chip">Docker Compose</span>
+  </div>
+</header>
+
+<section id="overview">
+  <h2>Overview</h2>
+  <p class="sub">Five requirements from the client, and the component that owns each one.</p>
+  <div class="table"><table>
+    <tr><th>Requirement</th><th>Component</th><th>How it is met</th></tr>
+    <tr><td>Target a market and switch it later</td><td>Industry presets + Campaigns</td><td>Each campaign picks an industry from a dropdown. A preset holds the search phrases (e.g. <em>hospital, diagnostic center</em>) and the decision-maker titles. Both are editable in the admin panel.</td></tr>
+    <tr><td>Company details</td><td>Places discovery + website crawler</td><td>Official Places API for name, address, phone, website, rating. The crawler adds emails, extra phones and social pages from the company's own site.</td></tr>
+    <tr><td>Decision maker</td><td>Extractor (Gemini) + search fallback</td><td>AI reads the Board / Management / About pages; if nobody senior is found, public search snippets are checked. Every person carries a source link and a score.</td></tr>
+    <tr><td>WhatsApp / Telegram alert</td><td>Notifier</td><td>Run summary and a card per high-confidence lead. Telegram by default; WhatsApp through the official Cloud API when configured.</td></tr>
+    <tr><td>Google Sheet CRM + scheduled email</td><td>Sheets mirror, Outbox, Dispatcher</td><td>Leads are mirrored one-way to a Sheet. Emails are drafted from a template, approved, then sent inside a set time window with a daily cap.</td></tr>
+  </table></div>
+</section>
+
+<section id="architecture">
+  <h2>Architecture</h2>
+  <p class="sub">Three services on one server share one database. Everything outside the dashed line is a third-party API, configured from the admin panel.</p>
+  <div class="figure" role="img" aria-label="Architecture diagram: admin browser to web service; web and worker share PostgreSQL; worker calls external APIs.">
+  <svg viewBox="0 0 960 420" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker>
+      <marker id="aa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah-a"/></marker>
+    </defs>
+    <!-- server zone -->
+    <rect class="zone" x="170" y="20" width="440" height="390" rx="14"/>
+    <text class="t-m" x="186" y="42">VPS · docker compose</text>
+
+    <!-- admin -->
+    <rect class="box" x="10" y="70" width="130" height="64" rx="10"/>
+    <text class="t-h" x="75" y="98" text-anchor="middle">Admin</text>
+    <text class="t-s" x="75" y="116" text-anchor="middle">browser</text>
+    <!-- recipients -->
+    <rect class="box" x="10" y="300" width="130" height="64" rx="10"/>
+    <text class="t-h" x="75" y="326" text-anchor="middle">Email</text>
+    <text class="t-h" x="75" y="344" text-anchor="middle">recipients</text>
+
+    <!-- web -->
+    <rect class="box-a" x="200" y="62" width="180" height="84" rx="10"/>
+    <text class="t-h" x="290" y="90" text-anchor="middle">web</text>
+    <text class="t-s" x="290" y="108" text-anchor="middle">admin panel · settings</text>
+    <text class="t-s" x="290" y="124" text-anchor="middle">unsubscribe · /health</text>
+    <!-- worker -->
+    <rect class="box-a" x="200" y="210" width="180" height="104" rx="10"/>
+    <text class="t-h" x="290" y="238" text-anchor="middle">worker</text>
+    <text class="t-s" x="290" y="256" text-anchor="middle">job runner (3 threads)</text>
+    <text class="t-s" x="290" y="272" text-anchor="middle">scheduler · Chromium</text>
+    <text class="t-s" x="290" y="288" text-anchor="middle">email dispatcher</text>
+    <!-- db -->
+    <rect class="box" x="430" y="120" width="160" height="110" rx="10"/>
+    <text class="t-h" x="510" y="150" text-anchor="middle">PostgreSQL</text>
+    <text class="t-s" x="510" y="168" text-anchor="middle">leads · people · runs</text>
+    <text class="t-s" x="510" y="184" text-anchor="middle">job queue</text>
+    <text class="t-s" x="510" y="200" text-anchor="middle">encrypted settings</text>
+    <!-- backup -->
+    <rect class="box" x="430" y="300" width="160" height="56" rx="10"/>
+    <text class="t-h" x="510" y="324" text-anchor="middle">backup</text>
+    <text class="t-s" x="510" y="342" text-anchor="middle">daily pg_dump · 7 days</text>
+
+    <!-- externals -->
+    <g>
+      <rect class="box-x" x="680" y="20" width="270" height="44" rx="8"/><text class="t-h" x="696" y="47">Google Places API</text><text class="t-m" x="934" y="47" text-anchor="end">companies</text>
+      <rect class="box-x" x="680" y="74" width="270" height="44" rx="8"/><text class="t-h" x="696" y="101">Company websites</text><text class="t-m" x="934" y="101" text-anchor="end">public pages</text>
+      <rect class="box-x" x="680" y="128" width="270" height="44" rx="8"/><text class="t-h" x="696" y="155">Serper / Brave Search</text><text class="t-m" x="934" y="155" text-anchor="end">snippets</text>
+      <rect class="box-x" x="680" y="182" width="270" height="44" rx="8"/><text class="t-h" x="696" y="209">Gemini API</text><text class="t-m" x="934" y="209" text-anchor="end">extraction</text>
+      <rect class="box-x" x="680" y="236" width="270" height="44" rx="8"/><text class="t-h" x="696" y="263">Google Sheets API</text><text class="t-m" x="934" y="263" text-anchor="end">mirror</text>
+      <rect class="box-x" x="680" y="290" width="270" height="44" rx="8"/><text class="t-h" x="696" y="317">Telegram / WhatsApp</text><text class="t-m" x="934" y="317" text-anchor="end">alerts</text>
+      <rect class="box-x" x="680" y="344" width="270" height="44" rx="8"/><text class="t-h" x="696" y="371">Gmail SMTP</text><text class="t-m" x="934" y="371" text-anchor="end">outreach</text>
+    </g>
+
+    <!-- arrows -->
+    <path class="ln-a" d="M140,102 L198,102" marker-end="url(#aa)"/>
+    <path class="ln" d="M380,104 L470,104 L470,118" marker-end="url(#a)"/>
+    <path class="ln" d="M380,228 L428,206" marker-end="url(#a)"/>
+    <path class="ln" d="M510,298 L510,232" marker-end="url(#a)"/>
+    <!-- worker to externals bus -->
+    <path class="ln-a" d="M290,314 L290,396 L640,396 L640,42"/>
+    <path class="ln-a" d="M640,42 L678,42" marker-end="url(#aa)"/>
+    <path class="ln-a" d="M640,96 L678,96" marker-end="url(#aa)"/>
+    <path class="ln-a" d="M640,150 L678,150" marker-end="url(#aa)"/>
+    <path class="ln-a" d="M640,204 L678,204" marker-end="url(#aa)"/>
+    <path class="ln-a" d="M640,258 L678,258" marker-end="url(#aa)"/>
+    <path class="ln-a" d="M640,312 L678,312" marker-end="url(#aa)"/>
+    <path class="ln-a" d="M640,366 L678,366" marker-end="url(#aa)"/>
+    <!-- recipients unsubscribe to web -->
+    <path class="ln" d="M140,322 L170,322 L170,130 L198,130" marker-end="url(#a)"/>
+    <text class="t-m" x="30" y="392">unsubscribe link</text>
+  </svg>
+  <div class="cap">The database is also the job queue (<code>SELECT … FOR UPDATE SKIP LOCKED</code>), so there is no Redis or message broker to run. The Google Sheet is a copy; the database is the source of truth.</div>
+  </div>
+</section>
+
+<section id="pipeline">
+  <h2>Pipeline</h2>
+  <p class="sub">A campaign run is split into small jobs. Each job does one stage for one company and can be retried on its own.</p>
+  <div class="stages">
+    <div class="stage"><div class="k">run_campaign<span>once per run</span></div>
+      <p>Builds the search plan: every industry phrase × every city, e.g. <code>diagnostic center in Chattogram, Bangladesh</code>. Stops early with a clear note if the Places key is missing.</p></div>
+    <div class="stage"><div class="k">discover<span>one per phrase, chained</span></div>
+      <p>Calls Places Text Search, up to 3 pages of 20. Skips permanently closed places. De-duplicates by Place ID, then website domain, then name + phone. A Facebook page listed as "website" is stored as a social link, never as a domain. Page progress is saved so a retry never pays twice. Stops at the campaign's company limit.</p></div>
+    <div class="stage"><div class="k">crawl_company<span>per new or stale company</span></div>
+      <p>Plain HTTP first; headless Chromium when the page needs JavaScript. Visits only same-site pages whose link looks like leadership or contact, in English or Bangla (<em>Board, Management, Chairman's message, পরিচালনা পর্ষদ, যোগাযোগ</em>).</p>
+      <ul><li>Obeys robots.txt, waits between requests to one site, max 8 pages.</li><li>Extracts emails (including <code>info [at] site [dot] com</code>), BD numbers normalised to +880, social links and page text.</li><li>Companies enriched in the last 30 days are not crawled again.</li></ul></div>
+    <div class="stage"><div class="k">find_decision_maker<span>per company</span></div>
+      <p>Gemini returns candidates as <code>{name, title, source, evidence_quote}</code>. If no senior person with confidence ≥ 55 comes back, two search queries run and Gemini reads the snippets. The candidate list is merged, scored, and the best person is chosen with an email address.</p></div>
+    <div class="stage"><div class="k">finalize_run<span>when no jobs remain</span></div>
+      <p>Counts results, mirrors the run's leads to Google Sheets, sends the Telegram summary and hot-lead cards, and creates email drafts for leads that have an address.</p></div>
+  </div>
+</section>
+
+<section id="sequence">
+  <h2>Run sequence</h2>
+  <p class="sub">What happens for one company, end to end.</p>
+<pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant A as Admin
+  participant W as Web
+  participant Q as Postgres queue
+  participant K as Worker
+  participant P as Places API
+  participant S as Company site
+  participant G as Gemini
+  participant T as Telegram
+  A->>W: Run now (Healthcare, Dhaka)
+  W->>Q: enqueue run_campaign
+  K->>Q: claim job
+  K->>P: "hospital in Dhaka, Bangladesh"
+  P-->>K: 20 places per page
+  K->>Q: upsert company, create lead, enqueue crawl
+  K->>S: About / Board / Contact pages
+  S-->>K: text, emails, phones
+  K->>G: pages text, target titles
+  G-->>K: name, title, quote
+  K->>K: verify name in source, score, pick email
+  K->>Q: save person, link lead
+  K->>T: run summary + hot leads
+</pre>
+</section>
+
+<section id="accuracy">
+  <h2>Accuracy model</h2>
+  <p class="sub">The AI may only report what the page says. Each person shown in the panel carries the reasons for their score.</p>
+  <div class="two">
+    <div class="panel">
+      <h3>Hallucination guard</h3>
+      <ul>
+        <li>A name that does not appear word-for-word in the fetched text is discarded.</li>
+        <li>An evidence quote that is not verbatim costs 30 points.</li>
+        <li>A search snippet that does not mention the company is rejected, so a namesake at another firm is not picked.</li>
+        <li>"MD" is read as Managing Director, but not in a medical degree such as <em>MBBS, MD (Medicine)</em>.</li>
+      </ul>
+    </div>
+    <div class="panel">
+      <h3>Confidence score (0–100)</h3>
+      <div class="score">
+        <div><span class="plus">+40</span><span>named on the company's own website</span></div>
+        <div><span class="plus">+25</span><span>in a search result that names the company</span></div>
+        <div><span class="plus">+15</span><span>title matches the campaign's titles</span></div>
+        <div><span class="plus">+10</span><span>both sources agree</span></div>
+        <div><span class="plus">+10</span><span>top-level title (MD, CEO, Chairman…)</span></div>
+        <div><span class="minus">−30</span><span>quote not found verbatim</span></div>
+      </div>
+      <p style="margin-top:10px"><span class="lvl hi">High ≥ 70</span> <span class="lvl md">Medium 40–69</span> <span class="lvl lo">Low &lt; 40</span></p>
+    </div>
+  </div>
+  <h3>Expected coverage in Bangladesh</h3>
+  <div class="table"><table>
+    <tr><th>Field</th><th>Availability</th><th>Why</th></tr>
+    <tr><td>Name, address, phone, website</td><td><span class="lvl hi">High</span></td><td>Google Places lists most operating businesses.</td></tr>
+    <tr><td>Company email</td><td><span class="lvl md">Medium</span></td><td>Only when the company has a website that shows it.</td></tr>
+    <tr><td>Decision-maker name and title</td><td><span class="lvl md">Medium</span> / <span class="lvl lo">Low</span></td><td>Mid-size and large firms publish boards; small local businesses often do not.</td></tr>
+    <tr><td>Decision-maker personal email</td><td><span class="lvl lo">Low</span></td><td>Rarely public. Guesses are marked <code>guessed</code> and never sent automatically.</td></tr>
+    <tr><td>Personal mobile</td><td><span class="lvl lo">Not promised</span></td><td>Not public, and a privacy risk.</td></tr>
+  </table></div>
+  <p>The dashboard shows the measured hit-rate per campaign. The first pilot of about 50 companies gives the real number before scaling.</p>
+</section>
+
+<section id="data">
+  <h2>Data model</h2>
+  <p class="sub">A company is stored once and can be a lead in many campaigns.</p>
+<pre class="mermaid">
+erDiagram
+  INDUSTRY_PRESET ||--o{ CAMPAIGN : "selected by"
+  CAMPAIGN ||--o{ RUN : has
+  CAMPAIGN ||--o{ LEAD : owns
+  COMPANY ||--o{ LEAD : "appears as"
+  COMPANY ||--o{ PERSON : employs
+  PERSON |o--o{ LEAD : "primary contact"
+  LEAD ||--o{ EMAIL_MESSAGE : receives
+  RUN ||--o{ JOB : "split into"
+  EMAIL_TEMPLATE ||--o{ CAMPAIGN : "used by"
+</pre>
+  <div class="table"><table>
+    <tr><th>Table</th><th>Key fields</th></tr>
+    <tr><td class="mono">companies</td><td>place_id (unique), domain (unique), name, category, city, phone, website, socials, emails found, crawled pages</td></tr>
+    <tr><td class="mono">people</td><td>full_name, title, seniority rank, email + status (found / company / guessed), source URL, evidence quote, confidence + reasons</td></tr>
+    <tr><td class="mono">leads</td><td>campaign × company (unique), primary person, CRM status, notes, owner, last contacted</td></tr>
+    <tr><td class="mono">jobs</td><td>type, payload, status, attempts, run_after, last_error, dedupe key</td></tr>
+    <tr><td class="mono">email_messages</td><td>to, subject, body, status (draft → approved → sent), not_before, unsubscribe token</td></tr>
+    <tr><td class="mono">settings</td><td>key, encrypted value — every API key and token lives here</td></tr>
+    <tr><td class="mono">api_usage</td><td>provider × day, calls, estimated cost — drives the daily budget caps</td></tr>
+  </table></div>
+</section>
+
+<section id="email">
+  <h2>Email rules</h2>
+  <p class="sub">Sending runs from a plain Gmail account, so the rules are strict by default.</p>
+  <div class="two">
+    <div class="panel"><h3>Before an email exists</h3><ul>
+      <li>Template with variables such as <code>{{company_name}}</code>, <code>{{first_name}}</code>.</li>
+      <li>Optional Gemini opening line, limited to facts the system holds.</li>
+      <li>Drafts wait for approval. Auto-approve only for confidence ≥ 70 with a real (not guessed) address.</li>
+    </ul></div>
+    <div class="panel"><h3>At send time</h3><ul>
+      <li>Only inside the window, default Sun–Thu 10:00–17:00 Dhaka.</li>
+      <li>Daily cap (default 40) and a random 60–180 s gap.</li>
+      <li>Checks the suppression list, do-not-contact status and a 30-day per-company cooldown.</li>
+      <li>Unsubscribe link and header on every email; a refused recipient is suppressed.</li>
+    </ul></div>
+  </div>
+</section>
+
+<section id="reliability">
+  <h2>Reliability</h2>
+  <div class="table"><table>
+    <tr><th>Situation</th><th>Behaviour</th></tr>
+    <tr><td>API error or timeout</td><td>Retried after 1 min, 5 min, 30 min; then marked failed with the error, and a Retry button on the run page.</td></tr>
+    <tr><td>API key not set</td><td>That stage is skipped with a note ("Gemini key not set"); company data is still collected.</td></tr>
+    <tr><td>Daily call cap reached</td><td>Jobs pause until 00:05 Dhaka time; one Telegram alert.</td></tr>
+    <tr><td>Worker restarts mid-run</td><td>Interrupted jobs return to the queue. Stages are idempotent, so nothing is duplicated or paid for twice.</td></tr>
+    <tr><td>Website down or blocked by robots.txt</td><td>Recorded on the run; the lead keeps its Places data and can still get a decision maker through search.</td></tr>
+  </table></div>
+</section>
+
+<section id="security">
+  <h2>Security &amp; compliance</h2>
+  <div class="two">
+    <div class="panel"><h3>Security</h3><ul>
+      <li>API keys encrypted at rest (Fernet), masked in the panel, never logged.</li>
+      <li>bcrypt passwords, signed session cookie, CSRF token on every form, login throttling.</li>
+      <li>Panel bound to localhost by default; HTTPS through Caddy.</li>
+      <li>Audit log of logins and setting changes (names, not values).</li>
+    </ul></div>
+    <div class="panel"><h3>Data sources</h3><ul>
+      <li>Google data only through the official Places API, not Maps page scraping.</li>
+      <li>No logged-in LinkedIn scraping: public search snippets and a link only.</li>
+      <li>WhatsApp only through Meta's Cloud API.</li>
+      <li>Business contact information only; client's legal team confirms outreach policy.</li>
+    </ul></div>
+  </div>
+</section>
+
+<section id="deploy">
+  <h2>Deployment &amp; cost</h2>
+  <p class="sub">One VPS with 2 vCPU and 4 GB RAM. Estimates at a few thousand companies per month, from public pricing in September 2026.</p>
+  <div class="table"><table>
+    <tr><th>Item</th><th>Monthly</th><th>Note</th></tr>
+    <tr><td>VPS</td><td class="num">$6 – 25</td><td>Hetzner or Contabo at the low end</td></tr>
+    <tr><td>Google Places API</td><td class="num">$0 → $35 / 1k calls</td><td>About 1,000 calls free per month; one call returns up to 20 companies</td></tr>
+    <tr><td>Serper search</td><td class="num">$0 → $50 / 50k</td><td>2,500 free queries first</td></tr>
+    <tr><td>Gemini API</td><td class="num">$0 → a few $</td><td>Free tier is rate-limited; model set in the panel</td></tr>
+    <tr><td>Gmail, Telegram, Google Sheets</td><td class="num">$0</td><td>Keep a single Gmail account near 30–50 emails a day</td></tr>
+    <tr><td><b>Typical total</b></td><td class="num"><b>$6 – 40</b></td><td>The dashboard shows estimated spend per provider per day</td></tr>
+  </table></div>
+</section>
+
+<section id="limits">
+  <h2>Known limits</h2>
+  <div class="note"><b>Tested so far:</b> 38 automated tests on SQLite and PostgreSQL, a crawl of a local website, and a click-through of the panel in a real browser. External APIs were simulated. The first live run with real keys is still to be done on the client's server.</div>
+  <ul>
+    <li>Places returns at most 60 results per search phrase; more coverage comes from more phrases and cities.</li>
+    <li>Follow-up email sequences, reply detection and Telegram commands are planned, not built.</li>
+    <li>Gemini model names change often; the panel's Test button lists the models the key can use.</li>
+  </ul>
+</section>
+
+<footer>BD Lead Engine · system design for the lead generation project · prices and model names should be re-checked before budgeting.</footer>
+</main>
+</div>
