@@ -128,3 +128,16 @@ def test_campaign_browser_options_saved(client, db):  # noqa: F811
     assert (c.browser_style, c.search_provider, c.on_block) == ("url", "bing", "pause")
     page = client.get(f"/campaigns/{c.id}/edit").text
     assert 'value="bing" selected' in page and 'value="pause" checked' in page
+
+
+def test_save_and_run_now_starts_a_run_but_save_only_does_not(client, db):  # noqa: F811
+    from app.models import Run
+
+    tok = login(client)
+    base = {"name": "Quick", "industry_slug": "healthcare", "cities": "Dhaka", "csrf_token": tok,
+            "discovery_source": "maps_browser"}
+    client.post("/campaigns", data=base)
+    assert db.scalar(select(Run)) is None
+    r = client.post("/campaigns", data={**base, "name": "Quick 2", "then_run": "1"}, follow_redirects=False)
+    run = db.scalar(select(Run))
+    assert run is not None and r.headers["location"] == f"/runs/{run.id}"

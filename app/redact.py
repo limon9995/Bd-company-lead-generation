@@ -80,6 +80,10 @@ def redact(text) -> str:
 class RedactingFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         try:
+            if record.name == "uvicorn.access" and isinstance(record.args, tuple):
+                # its formatter unpacks exactly (client, method, path, version, status): redact each, keep the shape
+                record.args = tuple(redact(a) if isinstance(a, str) else a for a in record.args)
+                return True
             record.msg = redact(record.getMessage())
             record.args = ()
         except Exception:  # noqa: BLE001 - never break logging

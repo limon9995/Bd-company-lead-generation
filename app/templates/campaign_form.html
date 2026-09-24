@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base.html" %}{% from "partials/macros.html" import icon %}
 {% block title %}{{ 'Edit' if c else 'New' }} campaign · BD Lead Generation{% endblock %}
 {% block content %}
 <div class="page-head"><div class="grow"><h1>{{ 'Edit campaign' if c else 'New campaign' }}</h1>
@@ -66,5 +66,8 @@
   {% if c %}<label class="inline" style="margin-top:14px"><input type="checkbox" name="is_active" {{ 'checked' if c.is_active }}> Active (scheduled runs enabled)</label>{% endif %}
 </div>
 </div>
-<div class="form-actions"><button class="btn primary">Save campaign</button> <a class="btn" href="/campaigns">Cancel</a></div>
+{# "Save only" first: pressing Enter in a field uses the first button and must not start a run #}
+<div class="form-actions"><button class="btn">Save only</button>
+  <button class="btn primary" name="then_run" value="1">{{ icon('play') }} Save &amp; run now</button>
+  <a class="btn" href="/campaigns">Cancel</a></div>
 </form>{% endblock %}

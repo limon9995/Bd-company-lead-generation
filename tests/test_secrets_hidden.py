@@ -55,6 +55,18 @@ def test_log_filter_hides_secrets(configure, caplog):
     assert records and TG not in records[0]
 
 
+def test_uvicorn_access_log_still_formats_and_hides_secrets(configure):
+    from uvicorn.logging import AccessFormatter
+
+    configure(telegram_bot_token=TG)
+    redact.refresh()
+    record = logging.LogRecord("uvicorn.access", logging.INFO, __file__, 1, '%s - "%s %s HTTP/%s" %d',
+                               ("127.0.0.1:5000", "GET", f"/hook?t={TG}", "1.1", 200), None)
+    assert redact.RedactingFilter().filter(record)
+    line = AccessFormatter("%(client_addr)s %(request_line)s %(status_code)s", use_colors=False).format(record)
+    assert "GET /hook?t=" in line and "200" in line and TG not in line
+
+
 @respx.mock
 def test_settings_page_and_test_result_never_show_keys(client, db):  # noqa: F811
     tok = login(client)

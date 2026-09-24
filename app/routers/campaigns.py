@@ -88,7 +88,8 @@ def campaign_save(request: Request, cid: int | None = None, name: str = Form(...
                   discovery_source: str = Form("places_api"), directory_urls: str = Form(""),
                   directory_max_pages: int = Form(5), directory_agent: str | None = Form(None),
                   browser_style: str = Form(""), search_provider: str = Form(""), on_block: str = Form("fallback"),
-                  is_active: str | None = Form(None), user: User = Depends(current_user), db: Session = Depends(get_db)):
+                  is_active: str | None = Form(None), then_run: str | None = Form(None),
+                  user: User = Depends(current_user), db: Session = Depends(get_db)):
     cron = schedule_cron.strip()
     if cron:
         try:
@@ -121,7 +122,9 @@ def campaign_save(request: Request, cid: int | None = None, name: str = Form(...
     db.flush()
     audit(db, user, "campaign.save", f"{c.id}:{c.name}")
     db.commit()
-    flash(request, f"Saved campaign '{c.name}'.")
+    if then_run:
+        return campaign_run(c.id, request, user, db)
+    flash(request, f"Saved campaign '{c.name}'. Press Run now to start it.")
     return RedirectResponse("/campaigns", 303)
 
 
