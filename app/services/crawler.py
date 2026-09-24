@@ -52,13 +52,35 @@ class CrawlResult:
         return "\n\n".join(f"[PAGE] {p.url}\n{p.text}" for p in self.pages)
 
 
+# Anti-bot interstitials (Cloudflare & co). We never try to get past them - the site is refusing automated access.
+BOT_WALL = re.compile(r"performing security verification|checking your browser|verify(ing)? you are (a )?human|"
+                      r"verifies you are not a bot|attention required! \| cloudflare|enable javascript and cookies to "
+                      r"continue|ddos protection by|just a moment\.\.\.", re.I)
+
+
+def is_bot_wall(text: str) -> bool:
+    return len(text) < 2000 and bool(BOT_WALL.search(text))
+
+
 class HttpFetcher:
     def __init__(self, timeout: float):
+        self._timeout = timeout
         self.client = httpx.Client(timeout=timeout, follow_redirects=True, headers={"User-Agent": USER_AGENT},
                                    verify=True)
+        self._insecure: httpx.Client | None = None
 
     def fetch(self, url: str) -> tuple[str, str]:
-        r = self.client.get(url)
+        try:
+            r = self.client.get(url)
+        except httpx.ConnectError as exc:
+            if "CERTIFICATE_VERIFY_FAILED" not in str(exc):
+                raise
+            # Many BD sites have expired / mismatched certificates. We only read public pages and send
+            # nothing, so read them anyway rather than losing the company.
+            if self._insecure is None:
+                self._insecure = httpx.Client(timeout=self._timeout, follow_redirects=True,
+                                              headers={"User-Agent": USER_AGENT}, verify=False)
+            r = self._insecure.get(url)
         r.raise_for_status()
         ctype = r.headers.get("content-type", "")
         if "html" not in ctype and "text" not in ctype:
@@ -67,6 +89,8 @@ class HttpFetcher:
 
     def close(self):
         self.client.close()
+        if self._insecure is not None:
+            self._insecure.close()
 
 
 class BrowserFetcher:
@@ -78,7 +102,8 @@ class BrowserFetcher:
         if config.chromium_executable:
             launch["executable_path"] = config.chromium_executable
         self._browser = self._pw.chromium.launch(**launch)
-        self._ctx = self._browser.new_context(user_agent=USER_AGENT)
+        # ignore_https_errors: read-only visits to sites with broken certificates (see HttpFetcher.fetch)
+        self._ctx = self._browser.new_context(user_agent=USER_AGENT, ignore_https_errors=True)
         self._timeout_ms = int(timeout * 1000)
 
     def fetch(self, url: str) -> tuple[str, str]:
@@ -196,6 +221,9 @@ def crawl(website: str, *, max_pages: int = 8, delay: float = 2.0, timeout: floa
         if not html:
             result.error = "could not load site"
             return result
+        if is_bot_wall(html_to_text(html)[1]):
+            result.error = "the site is behind bot protection (e.g. Cloudflare) - not crawled"
+            return result
 
         site_host = host_of(final_url) or site_host
         visited = {final_url}
@@ -215,6 +243,8 @@ def crawl(website: str, *, max_pages: int = 8, delay: float = 2.0, timeout: floa
                     continue
             page_html = pages_html[url]
             title, text = html_to_text(page_html)
+            if is_bot_wall(text):
+                continue
             result.pages.append(PageData(url=url, title=title, text=text))
             for link, _label in extract_links(page_html, url):
                 if link.startswith("mailto:"):

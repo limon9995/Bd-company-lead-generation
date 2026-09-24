@@ -15,6 +15,7 @@ from app.services.errors import ProviderError, RetryLater, SkipStage, SourceBloc
 from app.services.extractor import Source, extract_candidates, merge_and_score, search_queries
 from app.services.normalize import name_key, normalize_bd_phone, normalize_domain, person_key, social_kind
 from app.services.scoring import bucket
+from app.services.title_matcher import find_people
 from app.services.usage import check_budget, record_call
 
 log = logging.getLogger(__name__)
@@ -489,34 +490,50 @@ def find_decision_maker(db: Session, job: Job) -> None:
     campaign = db.get(Campaign, run.campaign_id)
     targets = campaign_targets(db, campaign)
     llm = providers.get_llm(db)
-    cands = []
-    if llm is None:
-        add_note(run, "Gemini API key is not set - decision makers were not extracted (Settings → Gemini).")
-    else:
-        web_sources = [Source("website", p["url"], p["text"]) for p in (company.crawled_pages or []) if p.get("text")]
-        if web_sources:
-            check_budget(db, "gemini")
-            cands = extract_candidates(llm, company.name, targets, web_sources)
+
+    def extract(sources: list[Source]) -> list:
+        if not sources:
+            return []
+        if llm is None:  # no Gemini key: match job titles next to names in the text
+            return find_people(company.name, targets, sources)
+        check_budget(db, "gemini")
+        try:
+            return extract_candidates(llm, company.name, targets, sources)
+        finally:
             record_call(db, "gemini")
-        scored = merge_and_score(cands, targets)
-        if not any(c.confidence >= 55 and c.rank <= 2 for c in scored):
+
+    if llm is None:
+        add_note(run, "Gemini API key is not set - decision makers were found by matching job titles "
+                      "(CEO, MD, Chairman ...) in website text and public LinkedIn search results.")
+    web_sources = [Source("website", p["url"], p["text"]) for p in (company.crawled_pages or []) if p.get("text")]
+    cands = extract(web_sources)
+    scored = merge_and_score(cands, targets)
+    have_top = any(c.confidence >= 55 and c.rank <= 2 for c in scored)
+    # Without Gemini the LinkedIn query always runs: it lists senior people the website leaves out.
+    queries = search_queries(company.name, company.city or "", targets)
+    queries = [q for q in queries if (llm is None and "linkedin.com" in q) or not have_top]
+    if queries:
+        search_sources = []
+        try:
             search = providers.get_search(db, campaign)
             if search is None:
                 add_note(run, "Search API not configured - only company websites were used for decision makers.")
             else:
-                search_sources = []
                 usage_key = getattr(search, "usage_key", "search")
-                for q in search_queries(company.name, company.city or "", targets):
+                for q in queries:
                     check_budget(db, usage_key)
                     try:
                         results = search(q, 10)
                     finally:
                         record_call(db, usage_key)
                     search_sources += [Source("search", r.url, f"{r.title} — {r.snippet}") for r in results if r.url]
-                if search_sources:
-                    check_budget(db, "gemini")
-                    cands += extract_candidates(llm, company.name, targets, search_sources)
-                    record_call(db, "gemini")
+        except SourceBlocked as exc:
+            # Search is a bonus source here: pause it (never bypass) but keep what the website gave us.
+            if not getattr(exc, "already_paused", False):
+                pause_source(db, exc)
+            add_note(run, f"{exc.source} blocked automated searching - some decision makers come from company "
+                          "websites only. A Serper or Brave API key (Settings) avoids this.")
+        cands += extract(search_sources)
     scored = merge_and_score(cands, targets)
     people = _save_people(db, company, scored)
     primary = people[0] if people else None
