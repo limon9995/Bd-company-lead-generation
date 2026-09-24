@@ -207,7 +207,43 @@ def discover(db: Session, job: Job) -> None:
 
 
 def discover_maps(db: Session, job: Job) -> None:
-    """Google Maps in a headless browser (no Places API key). One browser job at a time."""
+    """Google Maps in a headless browser (no Places API key). One browser job at a time.
+    If Google blocks us and the campaign allows it, the rest of the plan continues on the Places API."""
+    try:
+        _discover_maps(db, job)
+    except SourceBlocked as exc:
+        run = db.get(Run, job.payload["run_id"])
+        campaign = db.get(Campaign, run.campaign_id)
+        if campaign.on_block != "fallback" or not providers.places_key(db):
+            raise
+        db.rollback()
+        run = db.get(Run, job.payload["run_id"])
+        pause_source(db, exc, fallback_note="This run continues with the Google Places API.")
+        add_note(run, "Google Maps blocked the browser - switched to the Places API for the rest of this run.")
+        idx = job.payload["idx"]
+        enqueue(db, "discover", {"run_id": run.id, "idx": idx}, run_id=run.id, dedupe_key=f"discover:{run.id}:{idx}")
+
+
+def pause_source(db: Session, exc: SourceBlocked, fallback_note: str = "") -> "datetime":
+    """Pause a blocked browser source (once) and tell the admin. Returns the pause end."""
+    from zoneinfo import ZoneInfo
+
+    from app.config import config
+    from app.services import browser
+    from app.services.notifier import notify
+
+    until = browser.blocked_until(db, exc.source)
+    if until is not None:
+        return until
+    until = browser.set_blocked(db, exc.source, settings_store.get(db, "blocked_pause_hours"))
+    db.commit()
+    notify(db, f"⏸ <b>{exc.source}</b> blocked automated access ({exc}). Paused until "
+               f"{until.astimezone(ZoneInfo(config.timezone)):%d %b %H:%M}. " + (fallback_note or
+               "Jobs resume automatically; set the campaign's 'When a site blocks' to fall back to the API to keep going."))
+    return until
+
+
+def _discover_maps(db: Session, job: Job) -> None:
     from app.services import browser, maps_browser
 
     run = db.get(Run, job.payload["run_id"])
@@ -221,7 +257,7 @@ def discover_maps(db: Session, job: Job) -> None:
     browser.ensure_not_paused(db, "google")
     done = set(job.payload.get("done", []))
     with browser.source_lock("google"), browser.session_for(db, "google") as session:
-        typing = settings_store.get(db, "browser_style") == "type"
+        typing = providers.browser_style(db, campaign) == "type"
         max_results = settings_store.get(db, "maps_max_results")
         links = (maps_browser.search_by_typing(session, query, max_results) if typing
                  else maps_browser.collect_links(session, query, max_results))
@@ -431,7 +467,7 @@ def find_decision_maker(db: Session, job: Job) -> None:
             record_call(db, "gemini")
         scored = merge_and_score(cands, targets)
         if not any(c.confidence >= 55 and c.rank <= 2 for c in scored):
-            search = providers.get_search(db)
+            search = providers.get_search(db, campaign)
             if search is None:
                 add_note(run, "Search API not configured - only company websites were used for decision makers.")
             else:

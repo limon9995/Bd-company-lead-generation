@@ -41,7 +41,7 @@ python -m app.bootstrap                # migrations + seed industries/template
 python -m scripts.create_admin you@example.com
 uvicorn app.main:app --reload          # admin panel
 python -m app.worker                   # pipeline worker + scheduler (second terminal)
-pytest                                 # 63 tests, no network needed (external APIs are mocked)
+pytest                                 # 67 tests, no network needed (external APIs are mocked)
 ```
 
 Tests also run on Postgres: `DATABASE_URL=postgresql+psycopg://user:pw@localhost/test pytest`.
@@ -58,6 +58,11 @@ site, types into its search box, presses Enter, wheel-scrolls the results and cl
 **AI browser agent** (Gemini) reads each page and decides the next step — type a search, pick a filter, scroll, click
 Next, extract listings — within guardrails: same website only, never logs in or fills email/password forms, never
 clicks buy/pay/sign-up, step limit.
+
+Every mode is an option **per campaign**: source (Places API / Maps browser / directory), browser style (type &
+scroll / direct URL), decision-maker search (Serper / Brave / DuckDuckGo / Bing / off) and what to do when a site
+blocks the browser — **fall back to the API** (if a key is set; default) or pause. CAPTCHAs are not solved: a
+CAPTCHA is the site refusing automated access, and getting around it is exactly the legal risk this project avoids.
 
 Browser mode waits 4–9 s between page loads, runs one job per site at a time, and **stops** on a CAPTCHA,
 "unusual traffic" or login page — the source is paused (default 6 h, "Resume now" in Settings). It never solves

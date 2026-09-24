@@ -30,7 +30,7 @@ def world(monkeypatch, configure):
     monkeypatch.setattr(stages.places, "text_search", fp)
     monkeypatch.setattr(stages.crawler, "crawl", crawl)
     monkeypatch.setattr(providers, "get_llm", lambda db: llm)
-    monkeypatch.setattr(providers, "get_search", lambda db: search)
+    monkeypatch.setattr(providers, "get_search", lambda db, *a: search)
     return {"places": fp, "crawl": crawl, "llm": llm, "search": search}
 
 

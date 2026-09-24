@@ -27,6 +27,10 @@ class Campaign(TimestampMixin, Base):
     directory_urls: Mapped[list] = mapped_column(JSON, default=list)
     directory_max_pages: Mapped[int] = mapped_column(Integer, default=5)
     directory_agent: Mapped[bool] = mapped_column(Boolean, default=True)  # AI agent types/clicks/scrolls the site
+    # per-campaign overrides ("" = use the Settings default)
+    browser_style: Mapped[str] = mapped_column(String(10), default="")  # type | url
+    search_provider: Mapped[str] = mapped_column(String(20), default="")  # serper | brave | duckduckgo | bing | none
+    on_block: Mapped[str] = mapped_column(String(10), default="fallback")  # fallback (to API if key) | pause
 
 
 class Company(TimestampMixin, Base):

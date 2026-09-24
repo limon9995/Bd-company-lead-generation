@@ -25,7 +25,7 @@ def setup(monkeypatch, configure, links, read):
     monkeypatch.setattr(maps_browser, "click_result", read)
     monkeypatch.setattr(stages.crawler, "crawl", fake_crawl({}))
     monkeypatch.setattr(providers, "get_llm", lambda db: RuleLLM())
-    monkeypatch.setattr(providers, "get_search", lambda db: None)
+    monkeypatch.setattr(providers, "get_search", lambda db, *a: None)
     sent = []
     monkeypatch.setattr("app.services.notifier.notify", lambda db, t, *a: sent.append(t) or [])
     return sent
@@ -96,3 +96,66 @@ def test_directory_campaign_without_urls_fails_cleanly(db, monkeypatch, configur
     db.expire_all()
     run = db.get(Run, run.id)
     assert run.status == "failed" and any("directory URLs" in n for n in run.notes)
+
+
+def test_maps_block_falls_back_to_places_api(db, monkeypatch, configure):
+    from tests.fakes import FakePlaces
+
+    def blocked(q):
+        raise SourceBlocked("google", "unusual traffic")
+
+    sent = setup(monkeypatch, configure, blocked, lambda s, u: None)
+    configure(places_api_key="k")
+    monkeypatch.setattr(stages.places, "text_search", FakePlaces({"hospital": [[place(1, "https://a.com.bd"), place(2)]]}))
+    camp = Campaign(name="Maps", industry_slug="healthcare", cities=["Dhaka"], discovery_source="maps_browser",
+                    on_block="fallback")
+    db.add(camp)
+    db.commit()
+    run = start_run(db, camp)
+    drain()
+    db.expire_all()
+    run = db.get(Run, run.id)
+    assert run.status == "done" and run.counters["companies"] == 2
+    assert any("switched to the Places API" in n for n in run.notes)
+    assert browser.blocked_until(db, "google") is not None
+    assert any("continues with the Google Places API" in t for t in sent)
+
+
+def test_on_block_pause_does_not_fall_back(db, monkeypatch, configure):
+    def blocked(q):
+        raise SourceBlocked("google", "unusual traffic")
+
+    setup(monkeypatch, configure, blocked, lambda s, u: None)
+    configure(places_api_key="k")
+    camp = Campaign(name="Maps", industry_slug="healthcare", cities=["Dhaka"], discovery_source="maps_browser", on_block="pause")
+    db.add(camp)
+    db.commit()
+    run = start_run(db, camp)
+    drain()
+    assert db.scalar(select(Job.status).where(Job.run_id == run.id, Job.type == "discover_maps")) == "queued"
+    assert db.scalar(select(Job.id).where(Job.run_id == run.id, Job.type == "discover")) is None
+
+
+def test_browser_search_block_falls_back_to_serper(db, monkeypatch, configure):
+    import httpx
+    import respx
+
+    configure(search_provider="duckduckgo", serper_api_key="sk")
+
+    @contextlib.contextmanager
+    def blocked_session(db, source):
+        raise SourceBlocked(source, "bots use DuckDuckGo too")
+        yield
+
+    monkeypatch.setattr(browser, "session_for", blocked_session)
+    monkeypatch.setattr("app.services.notifier.notify", lambda *a, **k: [])
+    camp = Campaign(name="c", industry_slug="healthcare", cities=["Dhaka"], on_block="fallback")
+    search = providers.get_search(db, camp)
+    with respx.mock:
+        respx.post("https://google.serper.dev/search").mock(return_value=httpx.Response(200, json={
+            "organic": [{"title": "T", "link": "https://x.com", "snippet": "S"}]}))
+        assert search("acme md")[0].url == "https://x.com"
+    assert browser.blocked_until(db, "duckduckgo") is not None
+    camp.on_block = "pause"
+    with __import__("pytest").raises(SourceBlocked):
+        providers.get_search(db, camp)("acme md")

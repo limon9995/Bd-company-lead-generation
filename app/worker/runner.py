@@ -37,21 +37,11 @@ def _alert_budget_once(db, provider: str) -> None:
 
 
 def _handle_blocked(db, job: Job, exc: SourceBlocked) -> None:
-    """A site showed a CAPTCHA / block / login wall: pause that source and retry the job later. Never bypass."""
-    from app import settings_store
-    from app.services import browser
-    from app.services.notifier import notify
+    """A site showed a CAPTCHA / block / login wall and no fallback applied: pause that source and retry
+    the job when the pause ends. CAPTCHAs are never solved or bypassed."""
+    from app.pipeline.stages import pause_source
 
-    until = browser.blocked_until(db, exc.source)
-    newly = until is None
-    if newly:
-        until = browser.set_blocked(db, exc.source, settings_store.get(db, "blocked_pause_hours"))
-        db.commit()
-    queue.postpone(db, job, until, str(exc))
-    if newly:
-        notify(db, f"⏸ <b>{exc.source}</b> blocked automated access ({exc}). Paused until "
-                   f"{until.astimezone(ZoneInfo(config.timezone)):%d %b %H:%M}. Jobs resume automatically; "
-                   "switch that campaign to the API source if it keeps happening.")
+    queue.postpone(db, job, pause_source(db, exc), str(exc))
 
 
 def process(db, job: Job) -> None:

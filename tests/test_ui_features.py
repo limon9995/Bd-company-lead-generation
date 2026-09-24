@@ -117,3 +117,14 @@ def test_campaign_source_fields_and_resume_paused_source(client, db):  # noqa: F
     client.post("/settings/browser/resume", data={"source": "google", "csrf_token": tok})
     db.expire_all()
     assert browser.blocked_until(db, "google") is None
+
+
+def test_campaign_browser_options_saved(client, db):  # noqa: F811
+    tok = login(client)
+    client.post("/campaigns", data={"name": "Opt", "industry_slug": "healthcare", "cities": "Dhaka", "csrf_token": tok,
+                                    "discovery_source": "maps_browser", "browser_style": "url", "search_provider": "bing",
+                                    "on_block": "pause"})
+    c = db.scalar(select(Campaign))
+    assert (c.browser_style, c.search_provider, c.on_block) == ("url", "bing", "pause")
+    page = client.get(f"/campaigns/{c.id}/edit").text
+    assert 'value="bing" selected' in page and 'value="pause" checked' in page

@@ -44,6 +44,9 @@ run_campaign ─▶ discover[i] | discover_maps[i] | discover_directory[url] ─
   done). Code-enforced guardrails: same site only, no password/email/login forms, no login/sign-up/buy/pay controls,
   no contact links, `agent_max_steps`, stop on 3 identical actions. Each step = one Gemini call.
 * Politeness: random 4–9 s wait before each page load, one browser job per site (`source_lock`), a normal Chrome UA.
+* Per-campaign options: `browser_style`, `search_provider`, `on_block` (fallback | pause). With `fallback`, a blocked
+  Maps job re-queues the same search phrase as a Places API `discover` job, and a blocked browser search answers the
+  same query through Serper/Brave — only when a key is set; otherwise the source pauses.
 * Blocks: the URL and visible text are checked for CAPTCHA / "unusual traffic" / login pages → `SourceBlocked` →
   source paused for `blocked_pause_hours`, job postponed, one Telegram alert. No CAPTCHA solving or bypass.
 

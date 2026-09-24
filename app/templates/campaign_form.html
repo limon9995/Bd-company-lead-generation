@@ -24,6 +24,25 @@
     <div class="help">The AI uses the site like a person — types in its search box, picks filters, scrolls, clicks Next — and extracts listings on each page. Stays on that site, never logs in. Each action is one Gemini call (limit in Settings → Browser scraping). Off = read the URL and follow "Next" links only.</div></div>
   </div>
 </div>
+<div class="card" style="grid-column:1/-1;margin:0"><h2>How the browser works for this campaign</h2>
+  <div class="grid g3">
+    <div><label for="browser_style">Browser style</label>
+      <select id="browser_style" name="browser_style">
+        {% for v, t in [('', 'Settings default'), ('type', 'Type & scroll like a person (slower)'), ('url', 'Open result pages directly (faster)')] %}
+        <option value="{{ v }}" {{ 'selected' if (c.browser_style if c else '') == v }}>{{ t }}</option>{% endfor %}
+      </select><div class="help">Used by Google Maps (browser) and browser search.</div></div>
+    <div><label for="search_provider">Decision-maker search</label>
+      <select id="search_provider" name="search_provider">
+        {% for v, t in [('', 'Settings default'), ('serper', 'Serper API (key)'), ('brave', 'Brave API (key)'), ('duckduckgo', 'DuckDuckGo (browser, free)'), ('bing', 'Bing (browser, free)'), ('none', 'Off - websites only')] %}
+        <option value="{{ v }}" {{ 'selected' if (c.search_provider if c else '') == v }}>{{ t }}</option>{% endfor %}
+      </select></div>
+    <div><label>When a site blocks the browser</label>
+      {% set ob = c.on_block if c else 'fallback' %}
+      <label class="inline" style="margin:4px 0"><input type="radio" name="on_block" value="fallback" {{ 'checked' if ob == 'fallback' }}> Switch to the API (Places / Serper / Brave) if a key is set</label>
+      <label class="inline" style="margin:4px 0"><input type="radio" name="on_block" value="pause" {{ 'checked' if ob == 'pause' }}> Pause and resume later</label>
+      <div class="help">CAPTCHAs are never solved; the source pauses for the time set in Settings → Browser scraping.</div></div>
+  </div>
+</div>
 <div class="card" style="margin:0"><h2>Who to find</h2>
   <label for="name">Name</label><input id="name" type="text" name="name" value="{{ c.name if c }}" placeholder="Healthcare – Dhaka" required>
   <label for="industry_slug">Target industry</label><select id="industry_slug" name="industry_slug">
