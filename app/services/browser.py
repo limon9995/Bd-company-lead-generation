@@ -139,7 +139,7 @@ def blocked_until(db, source: str) -> datetime | None:
     return until if until > datetime.now(timezone.utc) else None
 
 
-def set_blocked(db, source: str, hours: int) -> datetime:
+def set_blocked(db, source: str, hours: float) -> datetime:
     from app.models import Setting
     from app.security import encrypt
 

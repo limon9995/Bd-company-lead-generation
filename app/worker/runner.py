@@ -11,7 +11,7 @@ from app.db import SessionLocal
 from app.models import ApiUsage, Job, Run
 from app.pipeline import queue
 from app.pipeline.stages import HANDLERS, add_note
-from app.services.errors import BudgetExceeded, SkipStage, SourceBlocked
+from app.services.errors import BudgetExceeded, RetryLater, SkipStage, SourceBlocked
 from app.services.usage import today_local
 
 log = logging.getLogger(__name__)
@@ -65,6 +65,9 @@ def process(db, job: Job) -> None:
             if job.type != "run_campaign" and str(exc) != "run cancelled":  # avoid duplicate/noisy notes
                 add_note(run, str(exc))
         queue.finish(db, db.get(Job, job.id), "skipped", str(exc))
+    except RetryLater as exc:
+        db.rollback()
+        queue.postpone(db, db.get(Job, job.id), queue.now() + timedelta(seconds=exc.seconds), str(exc))
     except SourceBlocked as exc:
         db.rollback()
         _handle_blocked(db, db.get(Job, job.id), exc)

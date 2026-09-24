@@ -48,15 +48,29 @@ def browser_search(db: Session, engine: str, campaign=None):
     fallback = getattr(campaign, "on_block", "fallback") == "fallback"
     typing = browser_style(db, campaign) == "type"
 
+    def _once(q, num):
+        with browser.source_lock(engine), browser.session_for(db, engine) as session:
+            if typing:
+                return search_browser.search_by_typing(session, engine, q, num)
+            return search_browser.search(session, engine, q, num)
+
     def _search(q: str, num: int = 10):
+        api = api_search(db) if fallback else None
         try:
             browser.ensure_not_paused(db, engine)
-            with browser.source_lock(engine), browser.session_for(db, engine) as session:
-                if typing:
-                    return search_browser.search_by_typing(session, engine, q, num)
-                return search_browser.search(session, engine, q, num)
+            last_error = None
+            for _ in range(1 + settings_store.get(db, "browser_retries")):  # crash/timeout: fresh browser each time
+                try:
+                    return _once(q, num)
+                except SourceBlocked:
+                    raise
+                except Exception as exc:  # noqa: BLE001
+                    last_error = exc
+            if api is None:
+                raise last_error
+            return api(q, num)
         except SourceBlocked as exc:
-            api = api_search(db) if fallback else None
+            # a search happens inside a bigger step, so no 30-minute wait here: API now, or pause
             if api is None:
                 raise
             from app.pipeline.stages import pause_source

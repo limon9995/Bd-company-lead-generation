@@ -20,3 +20,11 @@ class SourceBlocked(Exception):
     def __init__(self, source: str, detail: str = ""):
         super().__init__(f"{source} blocked automated access{': ' + detail if detail else ''}")
         self.source = source
+
+
+class RetryLater(Exception):
+    """Try this job again after a delay (e.g. one calm retry after a block). Not counted as a failure."""
+
+    def __init__(self, seconds: int, reason: str):
+        super().__init__(reason)
+        self.seconds = seconds

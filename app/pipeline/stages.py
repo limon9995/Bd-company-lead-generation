@@ -11,7 +11,7 @@ from app.pipeline import providers
 from app.pipeline.queue import enqueue, now
 from app.services import crawler, places
 from app.services.email_finder import choose_email
-from app.services.errors import ProviderError, SkipStage, SourceBlocked
+from app.services.errors import ProviderError, RetryLater, SkipStage, SourceBlocked
 from app.services.extractor import Source, extract_candidates, merge_and_score, search_queries
 from app.services.normalize import name_key, normalize_bd_phone, normalize_domain, person_key, social_kind
 from app.services.scoring import bucket
@@ -208,20 +208,50 @@ def discover(db: Session, job: Job) -> None:
 
 def discover_maps(db: Session, job: Job) -> None:
     """Google Maps in a headless browser (no Places API key). One browser job at a time.
-    If Google blocks us and the campaign allows it, the rest of the plan continues on the Places API."""
+
+    * Browser crash / timeout: the job is retried with a brand-new browser (normal job retry), up to
+      `browser_retries` times; after that the phrase continues on the Places API if a key is set.
+    * CAPTCHA / block: wait `block_retry_minutes`, try once more the normal way; if blocked again, the
+      phrase continues on the Places API (campaign 'fall back') or the source pauses. Never solved or bypassed.
+    """
+    from app.services import browser
+
     try:
         _discover_maps(db, job)
+        return
     except SourceBlocked as exc:
-        run = db.get(Run, job.payload["run_id"])
-        campaign = db.get(Campaign, run.campaign_id)
-        if campaign.on_block != "fallback" or not providers.places_key(db):
-            raise
         db.rollback()
-        run = db.get(Run, job.payload["run_id"])
+        job = db.get(Job, job.id)
+        wait = settings_store.get(db, "block_retry_minutes")
+        if wait > 0 and not job.payload.get("block_retry_done"):
+            job.payload = {**job.payload, "block_retry_done": True}
+            browser.set_blocked(db, "google", wait / 60)  # keep other Maps jobs quiet during the cool-down
+            db.commit()
+            raise RetryLater(wait * 60, f"google showed a block page; one retry in {wait} min") from exc
+        if not _fallback_to_places(db, job, exc):
+            raise
+    except Exception as exc:  # browser crashed / timed out / page changed
+        db.rollback()
+        job = db.get(Job, job.id)
+        if job.attempts <= settings_store.get(db, "browser_retries"):
+            raise  # normal retry: the next attempt opens a fresh browser
+        if not _fallback_to_places(db, job, exc):
+            raise
+
+
+def _fallback_to_places(db: Session, job: Job, exc: Exception) -> bool:
+    run = db.get(Run, job.payload["run_id"])
+    campaign = db.get(Campaign, run.campaign_id)
+    if campaign.on_block != "fallback" or not providers.places_key(db):
+        return False
+    if isinstance(exc, SourceBlocked):
         pause_source(db, exc, fallback_note="This run continues with the Google Places API.")
         add_note(run, "Google Maps blocked the browser - switched to the Places API for the rest of this run.")
-        idx = job.payload["idx"]
-        enqueue(db, "discover", {"run_id": run.id, "idx": idx}, run_id=run.id, dedupe_key=f"discover:{run.id}:{idx}")
+    else:
+        add_note(run, f"Google Maps browser kept failing ({str(exc)[:120]}) - switched to the Places API for this search.")
+    idx = job.payload["idx"]
+    enqueue(db, "discover", {"run_id": run.id, "idx": idx}, run_id=run.id, dedupe_key=f"discover:{run.id}:{idx}")
+    return True
 
 
 def pause_source(db: Session, exc: SourceBlocked, fallback_note: str = "") -> "datetime":

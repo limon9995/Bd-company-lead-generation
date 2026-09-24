@@ -16,8 +16,8 @@ def dummy_session(db, source):
     yield object()
 
 
-def setup(monkeypatch, configure, links, read):
-    configure(facebook_pages="false")
+def setup(monkeypatch, configure, links, read, **settings):
+    configure(facebook_pages="false", block_retry_minutes=settings.get("block_retry_minutes", 0))
     monkeypatch.setattr(browser, "session_for", dummy_session)
     for name in ("collect_links", "search_by_typing"):
         monkeypatch.setattr(maps_browser, name, lambda s, q, n: links(q))
@@ -159,3 +159,96 @@ def test_browser_search_block_falls_back_to_serper(db, monkeypatch, configure):
     camp.on_block = "pause"
     with __import__("pytest").raises(SourceBlocked):
         providers.get_search(db, camp)("acme md")
+
+
+
+def _run_due_now(db, run_id):
+    """Pretend the delay passed: make the run's queued jobs due and lift a cool-down pause."""
+    from app.pipeline.queue import now
+
+    for j in db.scalars(select(Job).where(Job.run_id == run_id, Job.status == "queued")):
+        j.run_after = now()
+    browser.clear_blocked(db, "google")
+    db.commit()
+    drain()
+
+
+def test_block_waits_then_retries_once_then_uses_api(db, monkeypatch, configure):
+    from tests.fakes import FakePlaces
+
+    calls = []
+
+    def blocked(q):
+        calls.append(q)
+        raise SourceBlocked("google", "unusual traffic")
+
+    sent = setup(monkeypatch, configure, blocked, lambda s, u: None, block_retry_minutes=30)
+    configure(places_api_key="k")
+    monkeypatch.setattr(stages.places, "text_search", FakePlaces({"hospital": [[place(1, "https://a.com.bd")]]}))
+    camp = Campaign(name="Maps", industry_slug="healthcare", cities=["Dhaka"], discovery_source="maps_browser")
+    db.add(camp)
+    db.commit()
+    run = start_run(db, camp)
+    drain()
+    job = db.scalar(select(Job).where(Job.run_id == run.id, Job.type == "discover_maps"))
+    assert job.status == "queued" and "one retry in 30 min" in job.last_error and len(calls) == 1
+    assert not [t for t in sent if "Paused until" in t]  # no alarm for the first block
+    _run_due_now(db, run.id)
+    assert len(calls) == 2  # tried once more the normal way
+    db.expire_all()
+    run = db.get(Run, run.id)
+    assert run.status == "done" and run.counters["companies"] == 1
+    assert any("switched to the Places API" in n for n in run.notes)
+
+
+def test_browser_crash_retries_with_fresh_browser_then_uses_api(db, monkeypatch, configure):
+    from tests.fakes import FakePlaces
+
+    opened = []
+
+    @contextlib.contextmanager
+    def counting_session(db, source):
+        opened.append(source)
+        yield object()
+
+    def crash(q):
+        raise RuntimeError("Target page, context or browser has been closed")
+
+    setup(monkeypatch, configure, crash, lambda s, u: None)
+    monkeypatch.setattr(browser, "session_for", counting_session)
+    configure(places_api_key="k", browser_retries=2)
+    monkeypatch.setattr(stages.places, "text_search", FakePlaces({"hospital": [[place(1, "https://a.com.bd")]]}))
+    camp = Campaign(name="Maps", industry_slug="healthcare", cities=["Dhaka"], discovery_source="maps_browser")
+    db.add(camp)
+    db.commit()
+    run = start_run(db, camp)
+    drain()
+    for _ in range(3):
+        _run_due_now(db, run.id)
+    assert len(opened) == 3  # first try + 2 retries, each with a new browser
+    db.expire_all()
+    run = db.get(Run, run.id)
+    assert run.status == "done" and run.counters["companies"] == 1
+    assert any("kept failing" in n for n in run.notes)
+
+
+def test_browser_search_crash_retries_then_serper(db, monkeypatch, configure):
+    import httpx
+    import respx
+
+    configure(search_provider="bing", serper_api_key="sk", browser_retries=2)
+    opened = []
+
+    @contextlib.contextmanager
+    def crashing(db, source):
+        opened.append(source)
+        raise RuntimeError("browser crashed")
+        yield
+
+    monkeypatch.setattr(browser, "session_for", crashing)
+    camp = Campaign(name="c", industry_slug="healthcare", cities=["Dhaka"], on_block="fallback")
+    with respx.mock:
+        respx.post("https://google.serper.dev/search").mock(return_value=httpx.Response(200, json={
+            "organic": [{"title": "T", "link": "https://x.com", "snippet": "S"}]}))
+        assert providers.get_search(db, camp)("q")[0].url == "https://x.com"
+    assert len(opened) == 3 and browser.blocked_until(db, "bing") is None  # a crash is not a block

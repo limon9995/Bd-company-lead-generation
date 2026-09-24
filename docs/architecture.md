@@ -47,6 +47,9 @@ run_campaign ─▶ discover[i] | discover_maps[i] | discover_directory[url] ─
 * Per-campaign options: `browser_style`, `search_provider`, `on_block` (fallback | pause). With `fallback`, a blocked
   Maps job re-queues the same search phrase as a Places API `discover` job, and a blocked browser search answers the
   same query through Serper/Brave — only when a key is set; otherwise the source pauses.
+* Retry order: a browser crash/timeout is retried with a brand-new browser (`browser_retries`, default 2) and then
+  falls back to the API; a CAPTCHA/block page gets one calm retry after `block_retry_minutes` (default 30) and then
+  falls back (or pauses). There is deliberately no "new identity / other browser" retry on a CAPTCHA.
 * Blocks: the URL and visible text are checked for CAPTCHA / "unusual traffic" / login pages → `SourceBlocked` →
   source paused for `blocked_pause_hours`, job postponed, one Telegram alert. No CAPTCHA solving or bypass.
 

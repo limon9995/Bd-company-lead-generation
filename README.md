@@ -41,7 +41,7 @@ python -m app.bootstrap                # migrations + seed industries/template
 python -m scripts.create_admin you@example.com
 uvicorn app.main:app --reload          # admin panel
 python -m app.worker                   # pipeline worker + scheduler (second terminal)
-pytest                                 # 67 tests, no network needed (external APIs are mocked)
+pytest                                 # 70 tests, no network needed (external APIs are mocked)
 ```
 
 Tests also run on Postgres: `DATABASE_URL=postgresql+psycopg://user:pw@localhost/test pytest`.
@@ -61,7 +61,9 @@ clicks buy/pay/sign-up, step limit.
 
 Every mode is an option **per campaign**: source (Places API / Maps browser / directory), browser style (type &
 scroll / direct URL), decision-maker search (Serper / Brave / DuckDuckGo / Bing / off) and what to do when a site
-blocks the browser — **fall back to the API** (if a key is set; default) or pause. CAPTCHAs are not solved: a
+blocks the browser — **fall back to the API** (if a key is set; default) or pause.
+Order of attempts: browser crash/timeout → new browser, up to 2 retries → API. CAPTCHA/block page → wait 30 min
+(setting), one more normal try → API (or pause). CAPTCHAs are not solved: a
 CAPTCHA is the site refusing automated access, and getting around it is exactly the legal risk this project avoids.
 
 Browser mode waits 4–9 s between page loads, runs one job per site at a time, and **stops** on a CAPTCHA,
