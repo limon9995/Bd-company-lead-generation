@@ -52,9 +52,11 @@ DEFS: list[SettingDef] = [
     SettingDef("search_cost_per_call", "Est. cost per call (USD)", "search", "float", default="0.001"),
 
     SettingDef("gemini_api_key", "API key", "gemini", "secret", help="https://aistudio.google.com → Get API key."),
-    SettingDef("gemini_model", "Model", "gemini", default="gemini-2.5-flash",
-               help="Any Gemini model id your key can access. Flash-class models are cheapest."),
-    SettingDef("gemini_cost_per_call", "Est. cost per call (USD)", "gemini", "float", default="0.0005"),
+    SettingDef("gemini_model", "Model", "gemini", default="gemini-flash-lite-latest",
+               help="'gemini-flash-lite-latest' (cheapest) or 'gemini-flash-latest' (better quality) always point to "
+                    "Google's current model. 'Test' lists the models your key can use."),
+    SettingDef("gemini_cost_per_call", "Est. cost per call (USD)", "gemini", "float", default="0.002",
+               help="Estimate (~6k input tokens per call). Check Google AI Studio billing for real cost."),
 
     SettingDef("telegram_bot_token", "Bot token", "telegram", "secret", help="Create a bot with @BotFather."),
     SettingDef("telegram_chat_id", "Chat ID", "telegram",

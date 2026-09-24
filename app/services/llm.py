@@ -57,3 +57,15 @@ class GeminiProvider:
         # No max_output_tokens: on "thinking" models it also caps hidden reasoning tokens and can
         # return empty text. Length is controlled in the prompt instead.
         return self._call(prompt, system).strip()
+
+
+def list_gemini_models(api_key: str) -> list[str]:
+    from google import genai
+
+    client = genai.Client(api_key=api_key)
+    names = []
+    for m in client.models.list():
+        actions = getattr(m, "supported_actions", None) or []
+        if not actions or "generateContent" in actions:
+            names.append((m.name or "").removeprefix("models/"))
+    return sorted(n for n in names if "gemini" in n)

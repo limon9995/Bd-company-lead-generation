@@ -83,11 +83,21 @@ def _test_search(db):
 def _test_gemini(db):
     from app.pipeline.providers import get_llm
 
+    from app.services.llm import list_gemini_models
+
     llm = get_llm(db)
     if llm is None:
         raise ProviderError("API key not set")
-    out = llm.generate_json('Return exactly this JSON: {"ok": true}')
-    return f"OK - model replied {out}"
+    try:
+        out = llm.generate_json('Return exactly this JSON: {"ok": true}')
+    except ProviderError as exc:
+        try:
+            models = [m for m in list_gemini_models(settings_store.get(db, "gemini_api_key")) if "flash" in m]
+        except Exception:  # noqa: BLE001
+            models = []
+        hint = f" Models available to this key: {', '.join(models[:15])}" if models else ""
+        raise ProviderError(f"{exc}.{hint}") from exc
+    return f"OK - {llm.model} replied {out}"
 
 
 def _test_telegram(db):
