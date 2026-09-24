@@ -14,6 +14,7 @@ router = APIRouter()
 
 def _view(db: Session) -> list[dict]:
     groups = []
+    tests = settings_store.test_results(db)
     for gid, title, desc in settings_store.GROUPS:
         fields = []
         for d in settings_store.DEFS:
@@ -23,7 +24,7 @@ def _view(db: Session) -> list[dict]:
             fields.append({"d": d, "value": "" if d.secret else raw, "is_set": settings_store.is_set(db, d.key),
                            "masked": mask(raw) if d.secret else ""})
         groups.append({"id": gid, "title": title, "desc": desc, "fields": fields,
-                       "testable": gid in TESTS})
+                       "testable": gid in TESTS, "last_test": tests.get(gid)})
     return groups
 
 
@@ -151,9 +152,12 @@ def test_group(group: str, user: User = Depends(current_user), db: Session = Dep
     if fn is None:
         return JSONResponse({"ok": False, "message": "No test for this group"})
     try:
-        return JSONResponse({"ok": True, "message": fn(db)})
+        ok, message = True, fn(db)
     except Exception as exc:  # noqa: BLE001 - show any failure to the admin
-        return JSONResponse({"ok": False, "message": str(exc)[:500]})
+        ok, message = False, str(exc)[:500]
+    settings_store.record_test(db, group, ok, message)
+    db.commit()
+    return JSONResponse({"ok": ok, "message": message})
 
 
 @router.post("/settings/telegram/detect", dependencies=[Depends(verify_csrf)])

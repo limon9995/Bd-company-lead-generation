@@ -1,19 +1,40 @@
-{% extends "base.html" %}{% block content %}
-<div class="row"><h1 class="grow">Leads</h1>
-<a class="btn" href="/leads/export.csv?campaign={{ f.campaign }}&status={{ f.status }}&level={{ f.level }}&q={{ f.q|urlencode }}">Export CSV</a></div>
-<form class="card row" method="get">
-<select name="campaign" style="width:auto"><option value="">All campaigns</option>{% for c in campaigns %}<option value="{{ c.id }}" {{ 'selected' if f.campaign == c.id|string }}>{{ c.name }}</option>{% endfor %}</select>
-<select name="status" style="width:auto"><option value="">Any CRM status</option>{% for s in statuses %}<option {{ 'selected' if f.status == s }}>{{ s }}</option>{% endfor %}</select>
-<select name="level" style="width:auto"><option value="">Any confidence</option>{% for l in ['high','medium','low','none'] %}<option {{ 'selected' if f.level == l }}>{{ l }}</option>{% endfor %}</select>
-<input type="text" name="q" value="{{ f.q }}" placeholder="Search company / person / city" style="width:260px"><button class="btn">Filter</button></form>
-<div class="card table-wrap"><table><tr><th>Company</th><th>Decision maker</th><th>Contact</th><th>Confidence</th><th>CRM</th></tr>
+{% extends "base.html" %}{% from "partials/macros.html" import icon %}
+{% block title %}Leads · BD Lead Generation{% endblock %}
+{% block content %}
+{% set qs = 'campaign=' ~ f.campaign ~ '&status=' ~ f.status ~ '&level=' ~ f.level ~ '&q=' ~ (f.q|urlencode) %}
+<div class="page-head"><div class="grow"><h1>Leads</h1><div class="sub">Every company found, with its best decision maker. Tick rows for bulk actions.</div></div>
+<a class="btn" href="/leads/export.csv?{{ qs }}">{{ icon('download') }} Export all (CSV)</a></div>
+
+<form class="card row" method="get" style="padding:12px 14px">
+<select name="campaign" style="width:auto" aria-label="Campaign"><option value="">All campaigns</option>{% for c in campaigns %}<option value="{{ c.id }}" {{ 'selected' if f.campaign == c.id|string }}>{{ c.name }}</option>{% endfor %}</select>
+<select name="status" style="width:auto" aria-label="CRM status"><option value="">Any CRM status</option>{% for s in statuses %}<option value="{{ s }}" {{ 'selected' if f.status == s }}>{{ s.replace('_', ' ') }}</option>{% endfor %}</select>
+<select name="level" style="width:auto" aria-label="Confidence"><option value="">Any confidence</option>{% for l, t in [('high','High (70+)'),('medium','Medium (40–69)'),('low','Low (<40)'),('none','No decision maker')] %}<option value="{{ l }}" {{ 'selected' if f.level == l }}>{{ t }}</option>{% endfor %}</select>
+<input type="search" name="q" value="{{ f.q }}" placeholder="Search company, person, city" style="width:240px" aria-label="Search">
+<button class="btn">Filter</button>{% if f.campaign or f.status or f.level or f.q %}<a class="btn ghost" href="/leads">Clear</a>{% endif %}</form>
+
+<form id="bulk-form" method="post" action="/leads/bulk"><input type="hidden" name="csrf_token" value="{{ csrf }}"><input type="hidden" name="back" value="{{ back }}">
+<div class="bulkbar" id="bulkbar" hidden>
+  <b><span id="bulk-count">0</span> selected</b>
+  <select name="crm_status" aria-label="New CRM status"><option value="">Set status…</option>{% for s in statuses %}<option value="{{ s }}">{{ s.replace('_', ' ') }}</option>{% endfor %}</select>
+  <button class="btn sm" name="action" value="status">Apply status</button>
+  <span class="faint">|</span>
+  <select name="template_id" aria-label="Email template">{% for t in templates_ %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}</select>
+  <button class="btn sm" name="action" value="draft">Create email drafts</button>
+  <span class="faint">|</span>
+  <button class="btn sm" name="action" value="export">{{ icon('download') }} Export selected</button>
+</div>
+<div class="card flush"><div class="table-wrap"><table><thead><tr>
+<th class="check"><input type="checkbox" id="select-all" aria-label="Select all on this page"></th>
+<th>Company</th><th>Decision maker</th><th>Contact</th><th>Confidence</th><th>CRM</th></tr></thead><tbody>
 {% for l in items %}{% set co = l.company %}{% set p = l.primary_person %}<tr>
-<td><a href="/leads/{{ l.id }}"><b>{{ co.name }}</b></a><div class="small muted">{{ co.category }} · {{ co.city }}</div></td>
-<td>{% if p %}{{ p.full_name }}<div class="small muted">{{ p.title }}</div>{% else %}<span class="muted">not found</span>{% endif %}</td>
-<td class="small">{% if p and p.email %}{{ p.email }} <span class="pill">{{ p.email_status }}</span><br>{% elif co.generic_emails %}{{ co.generic_emails[0] }}<br>{% endif %}{{ co.phone }}</td>
-<td>{% if p %}<span class="pill {{ p.confidence|bucket }}">{{ p.confidence }} {{ p.confidence|bucket }}</span>{% endif %}</td>
-<td><span class="pill">{{ l.crm_status }}</span></td></tr>
-{% else %}<tr><td colspan="5" class="muted">No leads match.</td></tr>{% endfor %}</table>
-<div class="row" style="margin-top:10px">{% if page > 1 %}<a class="btn sm" href="?campaign={{ f.campaign }}&status={{ f.status }}&level={{ f.level }}&q={{ f.q|urlencode }}&page={{ page - 1 }}">← Prev</a>{% endif %}
-{% if has_next %}<a class="btn sm" href="?campaign={{ f.campaign }}&status={{ f.status }}&level={{ f.level }}&q={{ f.q|urlencode }}&page={{ page + 1 }}">Next →</a>{% endif %}</div></div>
+<td class="check"><input type="checkbox" name="ids" value="{{ l.id }}" aria-label="Select {{ co.name }}"></td>
+<td><a href="/leads/{{ l.id }}"><b>{{ co.name }}</b></a><div class="small muted">{{ co.category }}{% if co.city %} · {{ co.city }}{% endif %}{% if l.campaign %} · {{ l.campaign.name }}{% endif %}</div></td>
+<td>{% if p %}{{ p.full_name }}<div class="small muted">{{ p.title }}</div>{% else %}<span class="faint">not found</span>{% endif %}</td>
+<td class="small">{% if p and p.email %}<div>{{ p.email }} <span class="pill">{{ p.email_status }}</span></div>{% elif co.generic_emails %}<div>{{ co.generic_emails[0] }}</div>{% endif %}<div class="muted">{{ co.phone }}</div></td>
+<td>{% if p %}<span class="pill {{ p.confidence|bucket }}">{{ p.confidence }} · {{ p.confidence|bucket }}</span>{% endif %}</td>
+<td><span class="pill">{{ l.crm_status.replace('_', ' ') }}</span></td></tr>
+{% else %}<tr><td colspan="6"><div class="empty">No leads match these filters.</div></td></tr>{% endfor %}</tbody></table></div>
+<div class="row" style="padding:12px 16px">{% if page > 1 %}<a class="btn sm" href="?{{ qs }}&page={{ page - 1 }}">← Previous</a>{% endif %}
+<span class="small muted">Page {{ page }}</span>{% if has_next %}<a class="btn sm" href="?{{ qs }}&page={{ page + 1 }}">Next →</a>{% endif %}</div></div>
+</form>
 {% endblock %}

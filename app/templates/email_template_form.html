@@ -1,11 +1,23 @@
-{% extends "base.html" %}{% block content %}
-<h1>{{ 'Edit' if t else 'New' }} template</h1>
-<form class="card" method="post" action="{{ '/templates/' ~ t.id if t else '/templates' }}"><input type="hidden" name="csrf_token" value="{{ csrf }}">
-<label>Name</label><input type="text" name="name" value="{{ t.name if t }}" required>
-<label>Subject</label><input type="text" name="subject_tpl" value="{{ t.subject_tpl if t }}" required>
-<label>Body</label><textarea name="body_tpl" style="min-height:240px" required>{{ t.body_tpl if t }}</textarea>
-<div class="help">Variables: {% for v in vars %}<span class="mono">{{ '{{' }}{{ v }}{{ '}}' }}</span> {% endfor %}. Signature and unsubscribe footer are added automatically.</div>
-<label><input type="checkbox" name="use_ai_personalisation" {{ 'checked' if not t or t.use_ai_personalisation }}> Let Gemini write <span class="mono">{{ '{{personal_line}}' }}</span> (one opening sentence, facts only)</label>
-<label>What you offer (context for the AI line)</label><textarea name="ai_instructions">{{ t.ai_instructions if t }}</textarea>
-<div style="margin-top:12px"><button class="btn primary">Save</button> <a class="btn" href="/templates">Cancel</a></div>
-</form>{% endblock %}
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if t else 'New' }} template · BD Lead Generation{% endblock %}
+{% block content %}
+<div class="page-head"><div class="grow"><div class="small"><a href="/templates">← Templates</a></div><h1>{{ 'Edit template' if t else 'New template' }}</h1>
+<div class="sub">The preview on the right updates as you type, using your latest lead (or sample data).</div></div></div>
+<form id="template-form" method="post" action="{{ '/templates/' ~ t.id if t else '/templates' }}"><input type="hidden" name="csrf_token" value="{{ csrf }}">
+<div class="grid g2">
+<div class="card" style="margin:0">
+<label for="name">Name</label><input id="name" type="text" name="name" value="{{ t.name if t }}" required>
+<label for="subject_tpl">Subject</label><input id="subject_tpl" type="text" name="subject_tpl" value="{{ t.subject_tpl if t }}" required>
+<label for="body_tpl">Body</label><textarea id="body_tpl" name="body_tpl" style="min-height:280px" required>{{ t.body_tpl if t }}</textarea>
+<div class="help">Click to insert:</div>
+<div class="row" style="gap:6px;margin-top:4px">{% for v in vars %}<button type="button" class="btn sm" data-insert-var="{{ v }}">{{ '{{' }}{{ v }}{{ '}}' }}</button>{% endfor %}</div>
+<label class="inline" style="margin-top:16px"><input type="checkbox" name="use_ai_personalisation" {{ 'checked' if not t or t.use_ai_personalisation }}> Let Gemini write <span class="mono">{{ '{{personal_line}}' }}</span></label>
+<div class="help">One opening sentence using only facts the system has (category, city, rating). Nothing invented.</div>
+<label for="ai_instructions">What you offer (context for the AI line)</label><textarea id="ai_instructions" name="ai_instructions" style="min-height:70px">{{ t.ai_instructions if t }}</textarea>
+<div class="form-actions"><button class="btn primary">Save template</button> <a class="btn" href="/templates">Cancel</a></div>
+</div>
+<div class="card" style="margin:0"><div class="card-head"><h2>Preview</h2><span class="small muted" id="pv-sample"></span></div>
+<div class="callout warn small" id="pv-unknown" hidden></div>
+<div class="preview-mail"><div class="subj" id="pv-subject"></div><pre id="pv-body"></pre></div>
+<p class="small muted">Signature and the unsubscribe footer are added automatically. The AI line is shown as a placeholder here.</p></div>
+</div></form>{% endblock %}

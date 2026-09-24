@@ -39,6 +39,29 @@ def campaign_targets(db: Session, campaign: Campaign) -> list[str]:
     return preset.default_titles if preset else []
 
 
+def run_progress(db: Session, run: Run) -> dict:
+    """Live progress for the run page (polled as JSON while a run is active)."""
+    rows = db.execute(select(Job.status, func.count(Job.id)).where(Job.run_id == run.id).group_by(Job.status)).all()
+    by_status = {s: n for s, n in rows}
+    total = sum(by_status.values())
+    finished = sum(n for s, n in by_status.items() if s in ("done", "failed", "skipped"))
+    return {"id": run.id, "status": run.status, "counters": run.counters or {}, "notes": run.notes or [],
+            "jobs": by_status, "total": total, "finished": finished,
+            "percent": 100 if run.status != "running" else (round(100 * finished / total) if total else 0)}
+
+
+def cancel_run(db: Session, run: Run) -> int:
+    """Stop a run: queued jobs are skipped; jobs already running finish their current step."""
+    n = 0
+    for j in db.scalars(select(Job).where(Job.run_id == run.id, Job.status == "queued")):
+        j.status, j.last_error = "skipped", "run cancelled"
+        n += 1
+    run.status = "cancelled"
+    run.finished_at = now()
+    add_note(run, "Run cancelled by an admin.")
+    return n
+
+
 def start_run(db: Session, campaign: Campaign, trigger: str = "manual") -> Run:
     run = Run(campaign_id=campaign.id, trigger=trigger, status="running", counters={}, notes=[], plan=[])
     db.add(run)
@@ -299,6 +322,9 @@ def finalize_run(db: Session, job: Job) -> None:
 
     run = db.get(Run, job.payload["run_id"])
     campaign = db.get(Campaign, run.campaign_id)
+    if run.status == "cancelled":
+        run.finished_at = run.finished_at or now()
+        return
     if not run.plan:  # run_campaign never got going (e.g. missing Places key)
         run.status = "failed"
         run.finished_at = run.finished_at or now()

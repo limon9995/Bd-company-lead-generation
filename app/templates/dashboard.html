@@ -1,25 +1,67 @@
-{% extends "base.html" %}{% block content %}
-<h1>Dashboard</h1>
-{% for w in warnings %}<div class="warn">⚠ {{ w }} — <a href="/settings">open Settings</a></div>{% endfor %}
-{% if failed_jobs %}<div class="warn">⚠ {{ failed_jobs }} failed job(s). Open a run to see errors and retry.</div>{% endif %}
-<div class="grid g4">
-  <div class="card stat"><div class="n">{{ total }}</div><div class="l">Leads</div></div>
-  <div class="card stat"><div class="n">{{ with_dm }} <span class="small muted">({{ rate }}%)</span></div><div class="l">With decision maker</div></div>
-  <div class="card stat"><div class="n">{{ high }}</div><div class="l">High confidence</div></div>
-  <div class="card stat"><div class="n">{{ sent_7d }}</div><div class="l">Emails sent (7 days)</div></div>
-  <div class="card stat"><div class="n"><a href="/outbox">{{ drafts }}</a></div><div class="l">Drafts to review</div></div>
+{% extends "base.html" %}{% from "partials/macros.html" import icon, empty %}
+{% block title %}Dashboard · BD Lead Generation{% endblock %}
+{% block content %}
+<div class="page-head"><div class="grow"><h1>Dashboard</h1><div class="sub">Leads found, decision-maker hit-rate and outreach at a glance.</div></div>
+<a class="btn primary" href="/campaigns">{{ icon('play') }} Run a campaign</a></div>
+
+{% if setup_done < setup_total %}
+<div class="card">
+  <div class="card-head"><h2>Finish setup — {{ setup_done }} of {{ setup_total }} done</h2><a class="btn sm" href="/setup">Open checklist</a></div>
+  <div class="bar" aria-label="Setup progress"><span style="width:{{ (100 * setup_done / setup_total)|round|int }}%"></span></div>
+  <ul class="steps" style="margin-top:8px">
+  {% for s in steps if s.state != 'done' and not s.optional %}{% if loop.index <= 3 %}
+    <li class="{{ s.state }}"><span class="mark">{{ '!' if s.state == 'error' else '' }}</span>
+      <div><div class="t">{{ s.title }}</div><div class="w">{{ s.why }}</div></div><a class="btn sm" href="{{ s.href }}">Fix</a></li>
+  {% endif %}{% endfor %}
+  </ul>
 </div>
-<div class="grid g2">
-<div class="card"><h2>Measured hit-rate per campaign</h2>
-<p class="small muted">Share of companies where a decision maker was actually found — measured, not promised.</p>
-<table><tr><th>Campaign</th><th>Leads</th><th>With DM</th><th>Rate</th></tr>
-{% for r in per_campaign %}<tr><td><a href="/leads?campaign={{ r.c.id }}">{{ r.c.name }}</a></td><td>{{ r.n }}</td><td>{{ r.dm }}</td><td>{{ r.rate }}%</td></tr>
-{% else %}<tr><td colspan="4" class="muted">No campaigns yet — <a href="/campaigns/new">create one</a>.</td></tr>{% endfor %}</table></div>
-<div class="card"><h2>API usage (estimated cost)</h2>
-<table><tr><th>Day</th><th>Provider</th><th>Calls</th><th>Est. USD</th></tr>
-{% for u in usage %}<tr><td>{{ u.day }}</td><td>{{ u.provider }}</td><td>{{ u.calls }}</td><td>${{ '%.3f'|format(u.est_cost_usd) }}</td></tr>
-{% else %}<tr><td colspan="4" class="muted">No API calls yet.</td></tr>{% endfor %}</table>
-<p class="small muted">Costs are estimates from the per-call prices in Settings. Your Google Cloud / provider billing page is the real number.</p></div>
+{% endif %}
+{% if failed_jobs %}<div class="callout err">{{ icon('alert') }}<div>{{ failed_jobs }} step(s) failed. Open a run to see the error and retry. <a href="/runs">Runs</a></div></div>{% endif %}
+
+<div class="grid g4" style="margin-bottom:16px">
+  <div class="card stat" style="margin:0"><div class="l">Leads</div><div class="n">{{ total }}</div><div class="d">all campaigns</div></div>
+  <div class="card stat" style="margin:0"><div class="l">With decision maker</div><div class="n">{{ with_dm }}</div><div class="d">{{ rate }}% hit-rate</div></div>
+  <div class="card stat" style="margin:0"><div class="l">High confidence</div><div class="n">{{ high }}</div><div class="d">score ≥ 70</div></div>
+  <div class="card stat" style="margin:0"><div class="l">Emails sent</div><div class="n">{{ sent_7d }}</div><div class="d">last 7 days</div></div>
+  <div class="card stat" style="margin:0"><div class="l">Drafts to review</div><div class="n"><a href="/outbox">{{ drafts }}</a></div><div class="d">waiting in Outbox</div></div>
 </div>
-<div class="card"><h2>Recent runs</h2>{% include "partials/runs_table.html" %}</div>
+
+<div class="card">
+  <div class="card-head"><h2>New leads per day</h2><span class="small muted">last 14 days · {{ chart.total }} total · Dhaka time</span></div>
+  {% if chart.has_data %}
+  <div class="chart-box">
+    <svg class="chart" viewBox="0 0 1000 200" role="img" aria-label="Bar chart of new leads per day for the last 14 days">
+      {% for t in chart.ticks %}<line class="grid-line" x1="36" x2="992" y1="{{ t.y }}" y2="{{ t.y }}"/>
+      <text class="axis-text" x="30" y="{{ t.y + 4 }}" text-anchor="end">{{ t.v }}</text>{% endfor %}
+      {% for r in chart.rows %}
+        {% if r.h > 0 %}<path id="bar{{ loop.index }}" class="bar-mark" d="M{{ r.x }},172 V{{ r.y + [4, r.h]|min }} q0,-{{ [4, r.h]|min }} {{ [4, r.h]|min }},-{{ [4, r.h]|min }} H{{ r.x + r.w - [4, r.h]|min }} q{{ [4, r.h]|min }},0 {{ [4, r.h]|min }},{{ [4, r.h]|min }} V172 Z"/>{% endif %}
+        <text class="axis-text" x="{{ r.cx }}" y="190" text-anchor="middle">{{ r.label }}</text>
+        <rect class="hit" x="{{ r.x - 2 }}" y="12" width="{{ r.w + 4 }}" height="160" data-bar="bar{{ loop.index }}" data-cx="{{ r.cx }}" data-cy="{{ [r.y, 160]|min }}"
+              data-tip="<b>{{ r.label }}</b> · {{ r.n }} lead{{ '' if r.n == 1 else 's' }} · {{ r.dm }} with decision maker"><title>{{ r.label }}: {{ r.n }} leads, {{ r.dm }} with decision maker</title></rect>
+      {% endfor %}
+    </svg>
+    <div class="chart-tip"></div>
+  </div>
+  <details class="small" style="margin-top:6px"><summary class="muted">Show as table</summary>
+    <table><thead><tr><th>Day</th><th>New leads</th><th>With decision maker</th></tr></thead><tbody>
+    {% for r in chart.rows %}<tr><td>{{ r.label }}</td><td class="num">{{ r.n }}</td><td class="num">{{ r.dm }}</td></tr>{% endfor %}</tbody></table></details>
+  {% else %}{{ empty("No leads in the last 14 days yet.", "/campaigns", "Run a campaign") }}{% endif %}
+</div>
+<div class="grid g2x">
+
+<div class="card flush"><div class="card-head"><h2>Measured hit-rate per campaign</h2></div>
+<p class="small muted" style="padding:0 20px">Share of companies where a decision maker was actually found.</p>
+<div class="table-wrap"><table><thead><tr><th>Campaign</th><th>Leads</th><th>With DM</th><th>Rate</th></tr></thead><tbody>
+{% for r in per_campaign %}<tr><td><a href="/leads?campaign={{ r.c.id }}">{{ r.c.name }}</a></td><td class="num">{{ r.n }}</td><td class="num">{{ r.dm }}</td>
+<td style="min-width:120px"><div class="row" style="gap:8px"><div class="bar grow"><span style="width:{{ r.rate }}%"></span></div><span class="num small">{{ r.rate }}%</span></div></td></tr>
+{% else %}<tr><td colspan="4">{{ empty("No campaigns yet.", "/campaigns/new", "Create one") }}</td></tr>{% endfor %}</tbody></table></div></div>
+
+<div class="card flush"><div class="card-head"><h2>API usage</h2><span class="small muted">estimated cost</span></div>
+<div class="table-wrap"><table><thead><tr><th>Day</th><th>Provider</th><th>Calls</th><th>Est. USD</th></tr></thead><tbody>
+{% for u in usage %}<tr><td class="nowrap">{{ u.day }}</td><td>{{ u.provider }}</td><td class="num">{{ u.calls }}</td><td class="num">${{ '%.3f'|format(u.est_cost_usd) }}</td></tr>
+{% else %}<tr><td colspan="4">{{ empty("No API calls yet.") }}</td></tr>{% endfor %}</tbody></table></div>
+<p class="small muted" style="padding:0 20px 14px">Estimates from the per-call prices in Settings. Your provider billing page is the real number.</p></div>
+</div>
+
+<div class="card flush"><div class="card-head"><h2>Recent runs</h2><a class="btn sm" href="/runs">All runs</a></div>{% include "partials/runs_table.html" %}</div>
 {% endblock %}

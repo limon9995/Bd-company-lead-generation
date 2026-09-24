@@ -1,37 +1,43 @@
-{% extends "base.html" %}{% block content %}
-<h1>{{ company.name }}</h1>
+{% extends "base.html" %}{% from "partials/macros.html" import icon %}
+{% block title %}{{ company.name }} · BD Lead Generation{% endblock %}
+{% block content %}
+<div class="page-head"><div class="grow"><div class="small"><a href="/leads">← Leads</a></div><h1>{{ company.name }}</h1>
+<div class="sub">{{ company.category }}{% if company.city %} · {{ company.city }}{% endif %} · campaign {{ lead.campaign.name }}</div></div>
+<span class="pill">{{ lead.crm_status.replace('_', ' ') }}</span></div>
 <div class="grid g2">
-<div class="card"><h2>Company</h2><table>
-<tr><th>Category</th><td>{{ company.category }}</td></tr><tr><th>Address</th><td>{{ company.address }}</td></tr>
-<tr><th>Phone</th><td>{{ company.phone }} {% for p in company.extra_phones %}<div class="small">{{ p }}</div>{% endfor %}</td></tr>
-<tr><th>Website</th><td>{% if company.website %}<a href="{{ company.website }}" target="_blank" rel="noopener">{{ company.website }}</a>{% endif %}</td></tr>
-<tr><th>Emails on site</th><td>{{ company.generic_emails|join(', ') }}</td></tr>
-<tr><th>Socials</th><td>{% for k, v in (company.socials or {}).items() %}<div><a href="{{ v }}" target="_blank" rel="noopener">{{ k }}</a></div>{% endfor %}</td></tr>
-<tr><th>Google Maps</th><td>{% if company.google_maps_url %}<a href="{{ company.google_maps_url }}" target="_blank" rel="noopener">open</a>{% endif %} {% if company.rating %}· ★ {{ company.rating }} ({{ company.reviews_count }}){% endif %}</td></tr>
-<tr><th>Pages crawled</th><td class="small">{% for p in company.crawled_pages %}<div><a href="{{ p.url }}" target="_blank" rel="noopener">{{ p.title or p.url }}</a></div>{% else %}<span class="muted">none</span>{% endfor %}</td></tr>
-</table></div>
+<div class="card"><h2>Company</h2>
+<dl class="kv">
+<dt>Address</dt><dd>{{ company.address or '—' }}</dd>
+<dt>Phone</dt><dd>{{ company.phone or '—' }}{% for p in company.extra_phones %}<div class="small">{{ p }}</div>{% endfor %}</dd>
+<dt>Website</dt><dd>{% if company.website %}<a href="{{ company.website }}" target="_blank" rel="noopener">{{ company.website }}</a>{% else %}—{% endif %}</dd>
+<dt>Emails on site</dt><dd>{{ company.generic_emails|join(', ') or '—' }}</dd>
+<dt>Social</dt><dd>{% for k, v in (company.socials or {}).items() %}<a href="{{ v }}" target="_blank" rel="noopener">{{ k }}</a>{{ ' · ' if not loop.last }}{% else %}—{% endfor %}</dd>
+<dt>Google Maps</dt><dd>{% if company.google_maps_url %}<a href="{{ company.google_maps_url }}" target="_blank" rel="noopener">Open</a>{% endif %}{% if company.rating %} · ★ {{ company.rating }} ({{ company.reviews_count }} reviews){% endif %}</dd>
+<dt>Pages read</dt><dd class="small">{% for p in company.crawled_pages %}<div><a href="{{ p.url }}" target="_blank" rel="noopener">{{ p.title or p.url }}</a></div>{% else %}<span class="faint">none</span>{% endfor %}</dd>
+</dl></div>
 <div class="card"><h2>CRM</h2>
 <form method="post" action="/leads/{{ lead.id }}"><input type="hidden" name="csrf_token" value="{{ csrf }}">
-<label>Status</label><select name="crm_status">{% for s in statuses %}<option {{ 'selected' if lead.crm_status == s }}>{{ s }}</option>{% endfor %}</select>
-<label>Primary decision maker</label><select name="primary_person_id"><option value="">—</option>{% for p in people %}<option value="{{ p.id }}" {{ 'selected' if lead.primary_person_id == p.id }}>{{ p.full_name }} — {{ p.title }} ({{ p.confidence }})</option>{% endfor %}</select>
-<label>Owner</label><input type="text" name="owner" value="{{ lead.owner }}">
-<label>Notes</label><textarea name="notes">{{ lead.notes }}</textarea>
-<div style="margin-top:10px"><button class="btn primary">Save</button></div></form>
-<hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
+<div class="grid g2" style="gap:0 14px">
+<div><label for="crm_status">Status</label><select id="crm_status" name="crm_status">{% for s in statuses %}<option value="{{ s }}" {{ 'selected' if lead.crm_status == s }}>{{ s.replace('_', ' ') }}</option>{% endfor %}</select></div>
+<div><label for="owner">Owner</label><input id="owner" type="text" name="owner" value="{{ lead.owner }}" placeholder="who follows up"></div></div>
+<label for="primary_person_id">Primary decision maker</label><select id="primary_person_id" name="primary_person_id"><option value="">—</option>{% for p in people %}<option value="{{ p.id }}" {{ 'selected' if lead.primary_person_id == p.id }}>{{ p.full_name }} — {{ p.title }} ({{ p.confidence }})</option>{% endfor %}</select>
+<label for="notes">Notes</label><textarea id="notes" name="notes">{{ lead.notes }}</textarea>
+<div class="form-actions"><button class="btn primary">Save</button></div></form>
+<h3>Email this lead</h3>
 <form method="post" action="/leads/{{ lead.id }}/draft" class="row"><input type="hidden" name="csrf_token" value="{{ csrf }}">
-<select name="template_id" style="width:auto">{% for t in templates_ %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}</select>
-<input type="email" name="to_email" placeholder="to (optional override)" style="width:220px"><button class="btn">Create email draft</button></form>
+<select name="template_id" style="width:auto" aria-label="Template">{% for t in templates_ %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}</select>
+<input type="email" name="to_email" placeholder="to (optional override)" style="width:220px" aria-label="Recipient override"><button class="btn">Create draft</button></form>
 </div></div>
-<div class="card"><h2>Decision makers found</h2>
-<p class="small muted">Every person is kept only if their name appears in the source text. Check the source before contacting.</p>
-<div class="table-wrap"><table><tr><th>Name / title</th><th>Email</th><th>Confidence</th><th>Why</th><th>Evidence / source</th></tr>
-{% for p in people %}<tr><td><b>{{ p.full_name }}</b><div class="small muted">{{ p.title }}</div>{% if p.linkedin_url %}<a class="small" href="{{ p.linkedin_url }}" target="_blank" rel="noopener">LinkedIn (public)</a>{% endif %}</td>
-<td class="small">{{ p.email }} {% if p.email %}<span class="pill">{{ p.email_status }}</span>{% endif %}</td>
+<div class="card flush"><div class="card-head"><h2>Decision makers found</h2></div>
+<p class="small muted" style="padding:0 20px">A person is kept only if their name appears in the source text. Open the source before contacting.</p>
+<div class="table-wrap"><table><thead><tr><th>Person</th><th>Email</th><th>Confidence</th><th>Why this score</th><th>Evidence</th></tr></thead><tbody>
+{% for p in people %}<tr><td><b>{{ p.full_name }}</b><div class="small muted">{{ p.title }}</div>{% if p.linkedin_url %}<a class="small" href="{{ p.linkedin_url }}" target="_blank" rel="noopener">Public LinkedIn result</a>{% endif %}</td>
+<td class="small">{{ p.email or '—' }} {% if p.email %}<span class="pill">{{ p.email_status }}</span>{% endif %}</td>
 <td><span class="pill {{ p.confidence|bucket }}">{{ p.confidence }}</span></td>
 <td class="small">{% for w in p.confidence_breakdown %}<div>{{ w }}</div>{% endfor %}</td>
-<td class="small">{% if p.evidence %}“{{ p.evidence }}”<br>{% endif %}{% for s in p.sources %}<a href="{{ s.url }}" target="_blank" rel="noopener">{{ s.kind }}</a> {% endfor %}</td></tr>
-{% else %}<tr><td colspan="5" class="muted">No decision maker found for this company.</td></tr>{% endfor %}</table></div></div>
-<div class="card"><h2>Emails</h2><table><tr><th>#</th><th>To</th><th>Subject</th><th>Status</th><th>Sent</th></tr>
+<td class="small">{% if p.evidence %}<div>“{{ p.evidence }}”</div>{% endif %}{% for s in p.sources %}<a href="{{ s.url }}" target="_blank" rel="noopener">{{ s.kind }} source</a>{{ ' · ' if not loop.last }}{% endfor %}</td></tr>
+{% else %}<tr><td colspan="5"><div class="empty">No decision maker found for this company.</div></td></tr>{% endfor %}</tbody></table></div></div>
+<div class="card flush"><div class="card-head"><h2>Emails</h2></div><div class="table-wrap"><table><thead><tr><th>#</th><th>To</th><th>Subject</th><th>Status</th><th>Sent</th></tr></thead><tbody>
 {% for m in messages %}<tr><td><a href="/outbox/{{ m.id }}">#{{ m.id }}</a></td><td>{{ m.to_email }}</td><td>{{ m.subject }}</td><td><span class="pill {{ m.status }}">{{ m.status }}</span></td><td>{{ m.sent_at|local }}</td></tr>
-{% else %}<tr><td colspan="5" class="muted">None.</td></tr>{% endfor %}</table></div>
+{% else %}<tr><td colspan="5"><div class="empty">No emails yet.</div></td></tr>{% endfor %}</tbody></table></div></div>
 {% endblock %}

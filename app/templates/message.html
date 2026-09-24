@@ -1,14 +1,24 @@
-{% extends "base.html" %}{% block content %}
-<h1>Email #{{ m.id }} <span class="pill {{ m.status }}">{{ m.status }}</span></h1>
-<p><a href="/leads/{{ m.lead_id }}">← {{ m.lead.company.name }}</a></p>
-{% if m.error %}<div class="flash err">{{ m.error }}</div>{% endif %}
-<form class="card" method="post" action="/outbox/{{ m.id }}"><input type="hidden" name="csrf_token" value="{{ csrf }}">
-<label>To</label><input type="email" name="to_email" value="{{ m.to_email }}" {{ 'readonly' if m.status == 'sent' }} required>
-<label>Subject</label><input type="text" name="subject" value="{{ m.subject }}" required>
-<label>Body</label><textarea name="body" style="min-height:320px">{{ m.body }}</textarea>
-<label>Don't send before (optional, {{ tz }})</label><input type="datetime-local" name="not_before" value="{{ m.not_before|local('%Y-%m-%dT%H:%M') if m.not_before }}" style="width:260px">
-{% if m.status != 'sent' %}<div class="row" style="margin-top:12px">
+{% extends "base.html" %}
+{% block title %}Email #{{ m.id }} · BD Lead Generation{% endblock %}
+{% block content %}
+<div class="page-head"><div class="grow"><div class="small"><a href="/outbox?status={{ m.status }}">← Outbox</a></div>
+<h1>Email to {{ m.lead.company.name }}</h1><div class="sub">#{{ m.id }} · <a href="/leads/{{ m.lead_id }}">open lead</a></div></div>
+<span class="pill {{ m.status }}">{{ m.status }}</span></div>
+{% if m.error %}<div class="callout err">{{ m.error }}</div>{% endif %}
+<form method="post" action="/outbox/{{ m.id }}"><input type="hidden" name="csrf_token" value="{{ csrf }}">
+<div class="grid g2">
+<div class="card" style="margin:0">
+<label for="to_email">To</label><input id="to_email" type="email" name="to_email" value="{{ m.to_email }}" {{ 'readonly' if m.status == 'sent' }} required>
+<label for="subject">Subject</label><input id="subject" type="text" name="subject" value="{{ m.subject }}" required>
+<label for="body">Body</label><textarea id="body" name="body" style="min-height:340px">{{ m.body }}</textarea>
+<label for="not_before">Don't send before ({{ tz }}, optional)</label><input id="not_before" type="datetime-local" name="not_before" value="{{ m.not_before|local('%Y-%m-%dT%H:%M') if m.not_before }}" style="max-width:260px">
+{% if m.status != 'sent' %}<div class="form-actions">
 <button class="btn primary" name="action" value="approve">Save &amp; approve</button>
 <button class="btn" name="action" value="draft">Save as draft</button>
-<button class="btn danger" name="action" value="cancel">Cancel email</button></div>{% else %}<p class="muted">Sent {{ m.sent_at|local }}</p>{% endif %}
-</form>{% endblock %}
+<button class="btn danger" name="action" value="cancel" data-confirm="Cancel this email?">Cancel email</button></div>
+{% else %}<p class="muted">Sent {{ m.sent_at|local }}.</p>{% endif %}
+</div>
+<div class="card" style="margin:0"><h2>How it will look</h2>
+<div class="preview-mail"><div class="small muted">To: {{ m.to_email }}</div><div class="subj">{{ m.subject }}</div><pre>{{ m.body }}</pre></div>
+<p class="small muted">Plain text email. The preview shows the last saved version.</p></div>
+</div></form>{% endblock %}

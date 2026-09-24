@@ -48,6 +48,8 @@ def leads(request: Request, campaign: str = "", status: str = "", level: str = "
         "items": items[:PAGE_SIZE], "has_next": len(items) > PAGE_SIZE, "page": page,
         "f": {"campaign": campaign, "status": status, "level": level, "q": q},
         "campaigns": db.scalars(select(Campaign).order_by(Campaign.name)).all(), "statuses": CRM_STATUSES,
+        "templates_": db.scalars(select(EmailTemplate).order_by(EmailTemplate.name)).all(),
+        "back": str(request.url.path) + (f"?{request.url.query}" if request.url.query else ""),
     })
 
 
@@ -63,6 +65,66 @@ def export_csv(campaign: str = "", status: str = "", level: str = "", q: str = "
     buf.seek(0)
     return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv",
                              headers={"Content-Disposition": "attachment; filename=leads.csv"})
+
+
+@router.post("/leads/bulk", dependencies=[Depends(verify_csrf)])
+async def leads_bulk(request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    form = await request.form()
+    ids = [int(x) for x in form.getlist("ids") if str(x).isdigit()]
+    action = form.get("action", "")
+    back = form.get("back") or "/leads"
+    if not back.startswith("/leads"):
+        back = "/leads"
+    if not ids:
+        flash(request, "Select at least one lead first.", "err")
+        return RedirectResponse(back, 303)
+    leads = db.scalars(select(Lead).where(Lead.id.in_(ids))).all()
+    if action == "export":
+        buf = io.StringIO()
+        buf.write("\ufeff")
+        w = csv.DictWriter(buf, fieldnames=LEAD_HEADERS, extrasaction="ignore")
+        w.writeheader()
+        for lead in leads:
+            w.writerow(lead_row(lead))
+        return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv",
+                                 headers={"Content-Disposition": "attachment; filename=leads-selected.csv"})
+    if action == "status":
+        status = form.get("crm_status", "")
+        if status not in CRM_STATUSES:
+            flash(request, "Pick a CRM status.", "err")
+            return RedirectResponse(back, 303)
+        for lead in leads:
+            lead.crm_status = status
+            if status == "do_not_contact":
+                for m in db.scalars(select(EmailMessage).where(EmailMessage.lead_id == lead.id,
+                                                                  EmailMessage.status.in_(["draft", "approved"]))):
+                    m.status, m.error = "cancelled", "lead marked do-not-contact"
+        audit(db, user, "lead.bulk_status", ",".join(map(str, ids))[:500], status)
+        db.commit()
+        flash(request, f"Set {len(leads)} lead(s) to '{status}'.")
+    elif action == "draft":
+        tpl = db.get(EmailTemplate, int(form.get("template_id") or 0))
+        if tpl is None:
+            flash(request, "Pick an email template.", "err")
+            return RedirectResponse(back, 303)
+        made, skipped = 0, 0
+        for lead in leads:
+            to, _ = outreach_address(lead)
+            has_open = db.scalar(select(EmailMessage.id).where(EmailMessage.lead_id == lead.id,
+                                                                EmailMessage.status.in_(["draft", "approved"])))
+            if not to or has_open or lead.crm_status == "do_not_contact" or is_suppressed(db, to):
+                skipped += 1
+                continue
+            make_draft(db, lead, tpl, to)
+            made += 1
+        audit(db, user, "lead.bulk_draft", ",".join(map(str, ids))[:500], f"{made} drafts")
+        db.commit()
+        flash(request, f"Created {made} draft(s)." + (f" Skipped {skipped} (no email, already drafted, or do-not-contact)." if skipped else ""))
+        if made:
+            return RedirectResponse("/outbox", 303)
+    else:
+        flash(request, "Unknown action.", "err")
+    return RedirectResponse(back, 303)
 
 
 @router.get("/leads/{lid}")

@@ -1,5 +1,6 @@
-{% extends "base.html" %}{% block content %}
-<h1>Runs</h1><div class="card table-wrap"><table><tr><th>#</th><th>Campaign</th><th>Status</th><th>Trigger</th><th>Started</th><th>Finished</th><th>Companies</th><th>DM</th></tr>
-{% for r in items %}<tr><td><a href="/runs/{{ r.id }}">#{{ r.id }}</a></td><td>{{ names.get(r.campaign_id, '') }}</td><td><span class="pill {{ r.status }}">{{ r.status }}</span></td>
-<td>{{ r.trigger }}</td><td>{{ r.started_at|local }}</td><td>{{ r.finished_at|local }}</td><td>{{ r.counters.get('companies', 0) }}</td><td>{{ r.counters.get('dm_found', 0) }}</td></tr>
-{% else %}<tr><td colspan="8" class="muted">No runs yet.</td></tr>{% endfor %}</table></div>{% endblock %}
+{% extends "base.html" %}
+{% block title %}Runs · BD Lead Generation{% endblock %}
+{% block content %}
+<div class="page-head"><div class="grow"><h1>Runs</h1><div class="sub">Each time a campaign runs. Open one to see progress, notes and errors.</div></div></div>
+<div class="card flush">{% set runs = items %}{% include "partials/runs_table.html" %}</div>
+{% endblock %}

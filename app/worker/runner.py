@@ -42,6 +42,8 @@ def process(db, job: Job) -> None:
     try:
         if handler is None:
             raise SkipStage(f"unknown job type {job.type}")
+        if run is not None and run.status == "cancelled" and job.type not in queue.FINAL_TYPES:
+            raise SkipStage("run cancelled")
         handler(db, job)
         db.commit()
         queue.finish(db, job, "done")
@@ -52,7 +54,7 @@ def process(db, job: Job) -> None:
         if run is not None:
             run = db.get(Run, job.run_id)
             run.notes, run.status = notes, status
-            if job.type != "run_campaign":  # run_campaign already wrote a clearer note
+            if job.type != "run_campaign" and str(exc) != "run cancelled":  # avoid duplicate/noisy notes
                 add_note(run, str(exc))
         queue.finish(db, db.get(Job, job.id), "skipped", str(exc))
     except BudgetExceeded as exc:

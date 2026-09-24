@@ -1,16 +1,20 @@
-from datetime import timedelta
+import math
+from datetime import datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app import settings_store
+from app.config import config
+from app.setup_status import checklist, progress
 from app.db import get_db
 from app.deps import audit, current_user, flash, render, verify_csrf
 from app.models import ApiUsage, AuditLog, Campaign, EmailMessage, Job, Lead, Person, Run, User
 from app.pipeline.queue import now
-from app.pipeline.stages import sync_leads_to_sheet
+from app.pipeline.stages import cancel_run, run_progress, sync_leads_to_sheet
 from app.services.errors import ProviderError
 
 router = APIRouter()
@@ -21,6 +25,50 @@ REQUIRED = [
     ("telegram_bot_token", "Telegram bot token - needed for notifications"),
     ("smtp_password", "SMTP password - needed to send emails"),
 ]
+
+
+def nice_step(raw: float) -> int:
+    """Smallest 1/2/5 x 10^k integer >= raw (so the y-axis ticks are round numbers)."""
+    if raw <= 1:
+        return 1
+    mag = 10 ** math.floor(math.log10(raw))
+    for m in (1, 2, 5, 10):
+        if m * mag >= raw:
+            return int(m * mag)
+    return int(10 * mag)
+
+
+def leads_per_day(db: Session, days: int = 14) -> dict:
+    """New leads per local (Dhaka) day, plus how many of them got a decision maker."""
+    tz = ZoneInfo(config.timezone)
+    today = datetime.now(tz).date()
+    start = datetime.combine(today - timedelta(days=days - 1), time(0), tz)
+    buckets = {today - timedelta(days=i): [0, 0] for i in range(days)}
+    for created, pid in db.execute(select(Lead.created_at, Lead.primary_person_id).where(Lead.created_at >= start)):
+        created = created if created.tzinfo else created.replace(tzinfo=ZoneInfo("UTC"))
+        d = created.astimezone(tz).date()
+        if d in buckets:
+            buckets[d][0] += 1
+            buckets[d][1] += 1 if pid else 0
+    rows = [{"day": d, "n": v[0], "dm": v[1]} for d, v in sorted(buckets.items())]
+    top = max((r["n"] for r in rows), default=0)
+    step = nice_step(top / 4)
+    ymax = step * 4
+    # geometry for an inline SVG (viewBox 0 0 1000 200; plot area x 36..992, y 12..172)
+    w = 956 / days
+    for i, r in enumerate(rows):
+        h = 160 * r["n"] / ymax
+        r.update(x=round(36 + i * w + 6, 1), w=round(w - 12, 1), y=round(172 - h, 1), h=round(h, 1),
+                 cx=round(36 + i * w + w / 2, 1), label=r["day"].strftime("%d %b"))
+    ticks = [{"v": step * k, "y": round(172 - 40 * k, 1)} for k in range(5)]
+    return {"rows": rows, "ticks": ticks, "total": sum(r["n"] for r in rows), "has_data": top > 0}
+
+
+@router.get("/setup")
+def setup_page(request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    steps = checklist(db)
+    done, total = progress(steps)
+    return render(request, "setup.html", {"steps": steps, "done": done, "total": total})
 
 
 @router.get("/")
@@ -39,7 +87,10 @@ def dashboard(request: Request, user: User = Depends(current_user), db: Session 
     warnings = [msg for key, msg in REQUIRED if not settings_store.is_set(db, key)]
     if settings_store.is_set(db, "telegram_bot_token") and not settings_store.get(db, "telegram_chat_id"):
         warnings.append("Telegram chat ID not set - Settings → Telegram → Detect chat ID")
+    steps = checklist(db)
+    setup_done, setup_total = progress(steps)
     return render(request, "dashboard.html", {
+        "chart": leads_per_day(db), "steps": steps, "setup_done": setup_done, "setup_total": setup_total,
         "total": total_leads, "with_dm": with_dm, "high": high, "sent_7d": sent_7d, "drafts": drafts,
         "rate": round(100 * with_dm / total_leads) if total_leads else 0, "per_campaign": per_campaign,
         "usage": usage, "warnings": warnings,
@@ -66,7 +117,31 @@ def run_detail(rid: int, request: Request, user: User = Depends(current_user), d
         by_status[j.status] = by_status.get(j.status, 0) + 1
     problem_jobs = [j for j in jobs if j.status in ("failed", "skipped") or (j.status == "queued" and j.last_error)]
     return render(request, "run_detail.html", {"run": run, "campaign": db.get(Campaign, run.campaign_id),
+                                               "prog": run_progress(db, run),
                                                "by_status": by_status, "problems": problem_jobs[:200], "total_jobs": len(jobs)})
+
+
+@router.get("/runs/{rid}/status")
+def run_status(rid: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    run = db.get(Run, rid)
+    if run is None:
+        raise HTTPException(404)
+    return JSONResponse(run_progress(db, run))
+
+
+@router.post("/runs/{rid}/cancel", dependencies=[Depends(verify_csrf)])
+def run_cancel(rid: int, request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    run = db.get(Run, rid)
+    if run is None:
+        raise HTTPException(404)
+    if run.status != "running":
+        flash(request, "This run is not running.", "err")
+    else:
+        n = cancel_run(db, run)
+        audit(db, user, "run.cancel", str(rid), f"{n} queued jobs skipped")
+        db.commit()
+        flash(request, f"Run #{rid} cancelled. {n} queued step(s) will not run; steps already in progress finish first.")
+    return RedirectResponse(f"/runs/{rid}", 303)
 
 
 @router.post("/runs/{rid}/retry-failed", dependencies=[Depends(verify_csrf)])

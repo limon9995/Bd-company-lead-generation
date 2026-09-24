@@ -1,7 +1,15 @@
-{% extends "base.html" %}{% block content %}
-<div class="row"><h1 class="grow">Industries</h1><a class="btn primary" href="/industries/new">Add industry</a></div>
-<p class="muted">An industry preset is the "switch": it holds the Google Places search phrases and the decision-maker titles. Pick it in a campaign to target that market.</p>
-<div class="card table-wrap"><table><tr><th>Name</th><th>Slug</th><th>Search phrases</th><th>Target titles</th><th></th></tr>
-{% for p in presets %}<tr><td><b>{{ p.name }}</b></td><td class="mono">{{ p.slug }}</td><td>{{ p.places_queries|join(', ') }}</td>
-<td>{{ p.default_titles|join(', ') }}</td><td><a class="btn sm" href="/industries/{{ p.id }}/edit">Edit</a></td></tr>{% endfor %}</table></div>
+{% extends "base.html" %}{% from "partials/macros.html" import icon %}
+{% block title %}Industries · BD Lead Generation{% endblock %}
+{% block content %}
+<div class="page-head"><div class="grow"><h1>Industries</h1>
+<div class="sub">The industry switch. Each one holds the Google Places search phrases and the decision-maker titles to look for.</div></div>
+<a class="btn primary" href="/industries/new">{{ icon('plus') }} Add industry</a></div>
+<div class="grid g3">
+{% for p in presets %}<div class="card" style="margin:0">
+  <div class="card-head"><h2>{{ p.name }}</h2><a class="btn sm" href="/industries/{{ p.id }}/edit">Edit</a></div>
+  <div class="small muted mono">{{ p.slug }}</div>
+  <h3>Searches</h3><div class="row" style="gap:5px">{% for q in p.places_queries %}<span class="pill">{{ q }}</span>{% endfor %}</div>
+  <h3>Titles</h3><div class="small">{{ p.default_titles|join(' · ') }}</div>
+</div>{% endfor %}
+</div>
 {% endblock %}

@@ -1,0 +1,21 @@
+{% extends "base.html" %}{% from "partials/macros.html" import icon %}
+{% block title %}Setup · BD Lead Generation{% endblock %}
+{% block content %}
+<div class="page-head"><div class="grow"><h1>Setup checklist</h1>
+<div class="sub">Add each key in Settings, then press <b>Test</b> there. A step turns green only after a successful test.</div></div></div>
+<div class="card">
+  <div class="card-head"><h2>{{ done }} of {{ total }} required steps done</h2></div>
+  <div class="bar"><span style="width:{{ (100 * done / total)|round|int }}%"></span></div>
+  <ul class="steps" style="margin-top:10px">
+  {% for s in steps %}
+    <li class="{{ s.state }}"><span class="mark">{% if s.state == 'done' %}✓{% elif s.state == 'error' %}!{% else %}{{ loop.index }}{% endif %}</span>
+      <div><div class="t">{{ s.title }} {% if s.optional %}<span class="pill">optional</span>{% endif %}
+        {% if s.state == 'untested' %}<span class="pill untested">saved, not tested</span>{% elif s.state == 'error' %}<span class="pill error">test failed</span>{% endif %}</div>
+        <div class="w">{{ s.why }}{% if s.detail and s.state == 'error' %} — {{ s.detail }}{% endif %}</div></div>
+      <a class="btn sm {{ 'primary' if s.state != 'done' and not s.optional }}" href="{{ s.href }}">{{ 'Review' if s.state == 'done' else 'Set up' }}</a></li>
+  {% endfor %}
+  </ul>
+</div>
+<div class="callout info">{{ icon('info') }}<div>Telegram chat ID: send <b>/start</b> to your bot in Telegram, then press <b>Detect chat ID</b> in Settings → Telegram.
+Or run <span class="mono">python scripts/get_telegram_chat_id.py --token &lt;BOT_TOKEN&gt;</span>.</div></div>
+{% endblock %}

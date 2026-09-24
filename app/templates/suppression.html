@@ -1,8 +1,10 @@
-{% extends "base.html" %}{% block content %}
-<h1>Suppression list</h1><p class="muted">Nobody on this list is emailed. Unsubscribes and hard bounces are added automatically.</p>
-<form class="card row" method="post" action="/suppression"><input type="hidden" name="csrf_token" value="{{ csrf }}">
-<input type="text" name="value" placeholder="name@company.com or @company.com" style="width:320px"><button class="btn primary">Add</button></form>
-<div class="card table-wrap"><table><tr><th>Email / domain</th><th>Reason</th><th>Added</th><th></th></tr>
-{% for s in items %}<tr><td>{{ s.value }}</td><td>{{ s.reason }}</td><td>{{ s.created_at|local }}</td>
-<td><form method="post" action="/suppression/{{ s.id }}/delete" data-confirm="Remove {{ s.value }}?"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="btn sm danger">Remove</button></form></td></tr>
-{% else %}<tr><td colspan="4" class="muted">Empty.</td></tr>{% endfor %}</table></div>{% endblock %}
+{% extends "base.html" %}
+{% block title %}Suppression list · BD Lead Generation{% endblock %}
+{% block content %}
+<div class="page-head"><div class="grow"><h1>Suppression list</h1><div class="sub">Nobody on this list is emailed. Unsubscribes and bounced addresses are added automatically.</div></div></div>
+<form class="card row" method="post" action="/suppression" style="padding:12px 14px"><input type="hidden" name="csrf_token" value="{{ csrf }}">
+<input type="text" name="value" placeholder="name@company.com, or @company.com for a whole domain" style="max-width:380px" aria-label="Email or domain"><button class="btn primary">Add</button></form>
+<div class="card flush"><div class="table-wrap"><table><thead><tr><th>Email / domain</th><th>Reason</th><th>Added</th><th></th></tr></thead><tbody>
+{% for s in items %}<tr><td>{{ s.value }}</td><td><span class="pill">{{ s.reason }}</span></td><td class="small">{{ s.created_at|local }}</td>
+<td><form method="post" action="/suppression/{{ s.id }}/delete"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="btn sm danger" data-confirm="Remove {{ s.value }} from the list? They could be emailed again.">Remove</button></form></td></tr>
+{% else %}<tr><td colspan="4"><div class="empty">The list is empty.</div></td></tr>{% endfor %}</tbody></table></div></div>{% endblock %}

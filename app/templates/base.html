@@ -1,20 +1,45 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="csrf" content="{{ csrf }}"><title>{% block title %}BD Lead Generation{% endblock %}</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Crect width=%2716%27 height=%2716%27 rx=%273%27 fill=%27%230f6b4f%27/%3E%3C/svg%3E"><link rel="stylesheet" href="/static/app.css"><script src="/static/app.js" defer></script></head>
-<body><div class="layout">
-<nav class="side">
-  <div class="brand">BD Lead Gen</div>
-  {% set nav = [("/", "Dashboard"), ("/campaigns", "Campaigns"), ("/leads", "Leads"), ("/outbox", "Outbox"), ("/runs", "Runs")] %}
-  {% for href, label in nav %}<a href="{{ href }}" class="{{ 'on' if (path == href or (href != '/' and path.startswith(href))) }}">{{ label }}</a>{% endfor %}
-  <div class="sep"></div>
-  {% set nav2 = [("/settings", "Settings & API keys"), ("/industries", "Industries"), ("/templates", "Email templates"), ("/suppression", "Suppression list"), ("/users", "Users"), ("/audit", "Audit log")] %}
-  {% for href, label in nav2 %}<a href="{{ href }}" class="{{ 'on' if path.startswith(href) }}">{{ label }}</a>{% endfor %}
-  <div class="sep"></div>
-  <form method="post" action="/logout" style="padding:0 10px"><input type="hidden" name="csrf_token" value="{{ csrf }}">
-    <div class="small muted">{{ user_email }}</div><button class="btn sm" style="margin-top:6px">Log out</button></form>
+<script>try{var t=localStorage.getItem('theme');if(t==='dark'||t==='light')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Crect width=%2716%27 height=%2716%27 rx=%273%27 fill=%27%230f6b4f%27/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/app.css"><script src="/static/app.js" defer></script></head>
+<body>
+{% include "partials/icons.html" %}
+{% from "partials/macros.html" import icon %}
+<header class="topbar">
+  <button class="btn ghost sm" data-nav-open aria-label="Open menu">{{ icon('menu') }}</button>
+  <strong>BD Lead Gen</strong>
+</header>
+<div class="scrim" data-nav-close></div>
+<div class="layout">
+<nav class="side" aria-label="Main">
+  <div class="brand"><span class="logo">BD</span> Lead Generation</div>
+  {% set nav = [("/", "Dashboard", "home"), ("/campaigns", "Campaigns", "target"), ("/leads", "Leads", "users"),
+                ("/outbox", "Outbox", "mail"), ("/runs", "Runs", "play")] %}
+  {% for href, label, ic in nav %}
+    <a class="nav {{ 'on' if (path == href or (href != '/' and path.startswith(href))) }}" href="{{ href }}">{{ icon(ic) }} {{ label }}</a>
+  {% endfor %}
+  <div class="nav-label">Configure</div>
+  {% set nav2 = [("/setup", "Setup checklist", "check"), ("/settings", "Settings & API keys", "gear"), ("/industries", "Industries", "layers"),
+                 ("/templates", "Email templates", "file"), ("/suppression", "Suppression list", "ban")] %}
+  {% for href, label, ic in nav2 %}
+    <a class="nav {{ 'on' if path.startswith(href) }}" href="{{ href }}">{{ icon(ic) }} {{ label }}</a>
+  {% endfor %}
+  <div class="nav-label">Admin</div>
+  <a class="nav {{ 'on' if path.startswith('/users') }}" href="/users">{{ icon('user') }} Users</a>
+  <a class="nav {{ 'on' if path.startswith('/audit') }}" href="/audit">{{ icon('list') }} Audit log</a>
+  <div class="side-foot">
+    <button class="btn ghost sm" type="button" data-theme-toggle title="Switch theme">{{ icon('moon') }} Theme: <span data-theme-label>System</span></button>
+    <div class="small muted" style="word-break:break-all">{{ user_email }}</div>
+    <form method="post" action="/logout"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="btn sm">Log out</button></form>
+  </div>
 </nav>
-<main>
-  {% for kind, msg in flashes %}<div class="flash {{ kind }}">{{ msg }}</div>{% endfor %}
+<main id="main">
   {% block content %}{% endblock %}
-</main></div></body></html>
+</main>
+</div>
+<div class="toasts" role="status" aria-live="polite">
+  {% for kind, msg in flashes %}<div class="toast {{ kind }}"><span>{{ msg }}</span><button type="button" aria-label="Dismiss">×</button></div>{% endfor %}
+</div>
+</body></html>

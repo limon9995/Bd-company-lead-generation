@@ -1,5 +1,9 @@
-{% extends "base.html" %}{% block content %}
-<div class="row"><h1 class="grow">Email templates</h1><a class="btn primary" href="/templates/new">New template</a></div>
-<div class="card table-wrap"><table><tr><th>Name</th><th>Subject</th><th>AI line</th><th></th></tr>
-{% for t in items %}<tr><td>{{ t.name }}</td><td>{{ t.subject_tpl }}</td><td>{{ 'yes' if t.use_ai_personalisation else 'no' }}</td><td><a class="btn sm" href="/templates/{{ t.id }}/edit">Edit</a></td></tr>{% endfor %}</table></div>
+{% extends "base.html" %}{% from "partials/macros.html" import icon %}
+{% block title %}Email templates · BD Lead Generation{% endblock %}
+{% block content %}
+<div class="page-head"><div class="grow"><h1>Email templates</h1><div class="sub">Used by campaigns to draft outreach emails.</div></div>
+<a class="btn primary" href="/templates/new">{{ icon('plus') }} New template</a></div>
+<div class="card flush"><div class="table-wrap"><table><thead><tr><th>Name</th><th>Subject</th><th>AI opening line</th><th>Updated</th><th></th></tr></thead><tbody>
+{% for t in items %}<tr><td><b>{{ t.name }}</b></td><td>{{ t.subject_tpl }}</td><td>{{ 'on' if t.use_ai_personalisation else 'off' }}</td><td class="small">{{ t.updated_at|local }}</td><td><a class="btn sm" href="/templates/{{ t.id }}/edit">Edit</a></td></tr>
+{% else %}<tr><td colspan="5"><div class="empty">No templates.</div></td></tr>{% endfor %}</tbody></table></div></div>
 {% endblock %}

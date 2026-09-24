@@ -1,12 +1,18 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Sign in · BD Lead Generation</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Crect width=%2716%27 height=%2716%27 rx=%273%27 fill=%27%230f6b4f%27/%3E%3C/svg%3E"><link rel="stylesheet" href="/static/app.css"></head><body>
-<div class="login card">
-  <h1>BD Lead Generation</h1>
-  {% for kind, msg in flashes %}<div class="flash {{ kind }}">{{ msg }}</div>{% endfor %}
-  {% if no_users %}<div class="warn">No admin user yet. Create one on the server:<br><span class="mono">python -m scripts.create_admin you@example.com</span></div>{% endif %}
-  <form method="post" action="/login"><input type="hidden" name="csrf_token" value="{{ csrf }}">
-    <label>Email</label><input type="email" name="email" required autofocus>
-    <label>Password</label><input type="password" name="password" required>
-    <div style="margin-top:14px"><button class="btn primary">Sign in</button></div>
-  </form>
+<title>Sign in · BD Lead Generation</title>
+<script>try{var t=localStorage.getItem('theme');if(t==='dark'||t==='light')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="/static/app.css"></head><body>
+<div class="login">
+  <div class="brand" style="padding:0 0 18px"><span class="logo">BD</span> Lead Generation</div>
+  <div class="card">
+    <h1 style="margin-bottom:6px">Sign in</h1>
+    <p class="muted">Admin panel for company discovery, decision makers and outreach.</p>
+    {% for kind, msg in flashes %}<div class="callout {{ 'err' if kind == 'err' else 'info' }}">{{ msg }}</div>{% endfor %}
+    {% if no_users %}<div class="callout warn">No admin user yet. On the server run:<br><span class="mono">python -m scripts.create_admin you@example.com</span></div>{% endif %}
+    <form method="post" action="/login"><input type="hidden" name="csrf_token" value="{{ csrf }}">
+      <label for="email">Email</label><input id="email" type="email" name="email" required autofocus autocomplete="username">
+      <label for="password">Password</label><input id="password" type="password" name="password" required autocomplete="current-password">
+      <div class="form-actions"><button class="btn primary" style="width:100%;justify-content:center">Sign in</button></div>
+    </form>
+  </div>
 </div></body></html>

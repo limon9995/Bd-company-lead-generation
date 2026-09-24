@@ -1,12 +1,14 @@
-{% extends "base.html" %}{% block content %}
-<h1>Users</h1>
+{% extends "base.html" %}
+{% block title %}Users · BD Lead Generation{% endblock %}
+{% block content %}
+<div class="page-head"><div class="grow"><h1>Users</h1><div class="sub">Everyone here has full admin access.</div></div></div>
 <div class="grid g2">
-<div class="card"><h2>Admins</h2><table><tr><th>Email</th><th>Status</th><th>Last login</th><th></th></tr>
-{% for u in users %}<tr><td>{{ u.email }}</td><td>{{ 'active' if u.is_active else 'disabled' }}</td><td>{{ u.last_login|local }}</td>
-<td>{% if u.id != me.id %}<form method="post" action="/users/{{ u.id }}/toggle"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="btn sm">{{ 'Disable' if u.is_active else 'Enable' }}</button></form>{% endif %}</td></tr>{% endfor %}</table></div>
+<div class="card flush"><div class="card-head"><h2>Admins</h2></div><div class="table-wrap"><table><thead><tr><th>Email</th><th>Status</th><th>Last login</th><th></th></tr></thead><tbody>
+{% for u in users %}<tr><td>{{ u.email }}{% if u.id == me.id %} <span class="pill">you</span>{% endif %}</td><td><span class="pill {{ 'ok' if u.is_active else '' }}">{{ 'active' if u.is_active else 'disabled' }}</span></td><td class="small">{{ u.last_login|local }}</td>
+<td>{% if u.id != me.id %}<form method="post" action="/users/{{ u.id }}/toggle"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="btn sm">{{ 'Disable' if u.is_active else 'Enable' }}</button></form>{% endif %}</td></tr>{% endfor %}</tbody></table></div></div>
 <div class="card"><h2>Add admin</h2><form method="post" action="/users"><input type="hidden" name="csrf_token" value="{{ csrf }}">
-<label>Email</label><input type="email" name="email" required><label>Password (10+ chars)</label><input type="password" name="password" minlength="10" required>
-<div style="margin-top:10px"><button class="btn primary">Add</button></div></form>
-<h2 style="margin-top:20px">Change my password</h2><form method="post" action="/account/password"><input type="hidden" name="csrf_token" value="{{ csrf }}">
-<label>Current</label><input type="password" name="current" required><label>New</label><input type="password" name="new" minlength="10" required>
-<div style="margin-top:10px"><button class="btn">Change</button></div></form></div></div>{% endblock %}
+<label for="new-email">Email</label><input id="new-email" type="email" name="email" required><label for="new-pw">Password (10+ characters)</label><input id="new-pw" type="password" name="password" minlength="10" required autocomplete="new-password">
+<div class="form-actions"><button class="btn primary">Add admin</button></div></form>
+<h2 style="margin-top:22px">Change my password</h2><form method="post" action="/account/password"><input type="hidden" name="csrf_token" value="{{ csrf }}">
+<label for="cur-pw">Current password</label><input id="cur-pw" type="password" name="current" required autocomplete="current-password"><label for="nw-pw">New password</label><input id="nw-pw" type="password" name="new" minlength="10" required autocomplete="new-password">
+<div class="form-actions"><button class="btn">Change password</button></div></form></div></div>{% endblock %}

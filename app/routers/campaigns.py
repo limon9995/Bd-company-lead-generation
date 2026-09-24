@@ -139,6 +139,45 @@ def template_form(request: Request, tid: int | None = None, user: User = Depends
     return render(request, "email_template_form.html", {"t": db.get(EmailTemplate, tid) if tid else None, "vars": TEMPLATE_VARS})
 
 
+@router.post("/templates/preview", dependencies=[Depends(verify_csrf)])
+async def template_preview(request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Render the (unsaved) template against a real lead, or sample data when there are no leads yet."""
+    from fastapi.responses import JSONResponse
+
+    from app import settings_store
+    from app.models import Lead
+    from app.pipeline.emails import build_context, unsubscribe_url
+    from app.services import mailer
+
+    form = await request.form()
+    lead = db.scalar(select(Lead).where(Lead.primary_person_id.is_not(None)).order_by(Lead.id.desc()).limit(1)) \
+        or db.scalar(select(Lead).order_by(Lead.id.desc()).limit(1))
+    if lead is not None:
+        ctx, sample = build_context(db, lead), f"{lead.company.name} (lead #{lead.id})"
+    else:
+        ctx = {"company_name": "Example Diagnostic Centre", "person_name": "Rahim Uddin", "first_name": "Rahim",
+               "title": "Managing Director", "city": "Dhaka", "industry": "healthcare", "category": "Diagnostic center",
+               "sender_name": settings_store.get(db, "sender_name") or "Your Name",
+               "sender_company": settings_store.get(db, "sender_company") or "Your Company"}
+        sample = "sample data (no leads yet)"
+    # show what's missing instead of silently blank text ("I'm  from .")
+    ctx["sender_name"] = ctx.get("sender_name") or "[your name - Settings → Email sending]"
+    ctx["sender_company"] = ctx.get("sender_company") or "[your company]"
+    use_ai = bool(form.get("use_ai_personalisation"))
+    ctx["personal_line"] = "[Gemini writes one opening sentence here, using only facts about the company]" if use_ai else ""
+    import re as _re
+
+    body = _re.sub(r"\n{3,}", "\n\n", mailer.render(str(form.get("body_tpl", "")), ctx)).strip()
+    sig = settings_store.get(db, "sender_signature")
+    if sig:
+        body += "\n\n" + sig
+    body += mailer.footer(unsubscribe_url("<token>"), ctx.get("sender_company", ""))
+    unknown = sorted({v for v in mailer.VAR.findall(str(form.get("subject_tpl", "")) + str(form.get("body_tpl", "")))
+                      if v not in mailer.TEMPLATE_VARS})
+    return JSONResponse({"subject": mailer.render(str(form.get("subject_tpl", "")), ctx).strip(), "body": body,
+                         "sample": sample, "unknown_vars": unknown})
+
+
 @router.post("/templates", dependencies=[Depends(verify_csrf)])
 @router.post("/templates/{tid}", dependencies=[Depends(verify_csrf)])
 def template_save(request: Request, tid: int | None = None, name: str = Form(...), subject_tpl: str = Form(...),

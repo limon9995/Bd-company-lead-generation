@@ -1,15 +1,17 @@
-{% extends "base.html" %}{% block content %}
-<h1>{{ 'Edit' if p else 'New' }} industry</h1>
-<form class="card" method="post" action="{{ '/industries/' ~ p.id if p else '/industries' }}"><input type="hidden" name="csrf_token" value="{{ csrf }}">
-<div class="grid g2">
-<div><label>Name</label><input type="text" name="name" value="{{ p.name if p }}" required></div>
-<div><label>Slug</label><input type="text" name="slug" value="{{ p.slug if p }}" {{ 'readonly' if p }} required><div class="help">Short id, e.g. healthcare</div></div>
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if p else 'New' }} industry · BD Lead Generation{% endblock %}
+{% block content %}
+<div class="page-head"><div class="grow"><div class="small"><a href="/industries">← Industries</a></div><h1>{{ 'Edit industry' if p else 'New industry' }}</h1></div></div>
+<form class="card" method="post" action="{{ '/industries/' ~ p.id if p else '/industries' }}" style="max-width:820px"><input type="hidden" name="csrf_token" value="{{ csrf }}">
+<div class="grid g2" style="gap:0 16px">
+<div><label for="name">Name</label><input id="name" type="text" name="name" value="{{ p.name if p }}" required></div>
+<div><label for="slug">Short id</label><input id="slug" type="text" name="slug" value="{{ p.slug if p }}" {{ 'readonly' if p }} required placeholder="e.g. pharma"></div>
 </div>
-<label>Google Places search phrases (comma or new line separated)</label>
-<textarea name="places_queries">{{ p.places_queries|join('\n') if p }}</textarea>
-<div class="help">Each phrase is searched in each campaign city: "&lt;phrase&gt; in &lt;city&gt;, Bangladesh". Places returns max 60 results per phrase.</div>
-<label>Default decision-maker titles (most senior first)</label>
-<textarea name="default_titles">{{ p.default_titles|join('\n') if p }}</textarea>
-<label>Pitch context (used by AI personalisation)</label><input type="text" name="pitch_context" value="{{ p.pitch_context if p }}">
-<div style="margin-top:12px"><button class="btn primary">Save</button> <a class="btn" href="/industries">Cancel</a></div>
+<label for="places_queries">Google Places search phrases (one per line)</label>
+<textarea id="places_queries" name="places_queries">{{ p.places_queries|join('\n') if p }}</textarea>
+<div class="help">Each phrase is searched in every campaign city as "phrase in city, Bangladesh". Google returns at most 60 places per phrase, so more specific phrases give more companies.</div>
+<label for="default_titles">Decision-maker titles, most senior first (one per line)</label>
+<textarea id="default_titles" name="default_titles">{{ p.default_titles|join('\n') if p }}</textarea>
+<label for="pitch_context">Short description (used in AI personalisation)</label><input id="pitch_context" type="text" name="pitch_context" value="{{ p.pitch_context if p }}" placeholder="hospitals, clinics and diagnostic centres">
+<div class="form-actions"><button class="btn primary">Save industry</button> <a class="btn" href="/industries">Cancel</a></div>
 </form>{% endblock %}

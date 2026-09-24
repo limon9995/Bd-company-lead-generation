@@ -1,0 +1,3 @@
+{% macro icon(name) %}<svg class="icon" aria-hidden="true"><use href="#i-{{ name }}"/></svg>{% endmacro %}
+{% macro csrf_field(csrf) %}<input type="hidden" name="csrf_token" value="{{ csrf }}">{% endmacro %}
+{% macro empty(text, href=None, cta=None) %}<div class="empty">{{ text }}{% if href %} <a href="{{ href }}">{{ cta }}</a>{% endif %}</div>{% endmacro %}

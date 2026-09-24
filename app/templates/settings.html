@@ -1,37 +1,43 @@
-{% extends "base.html" %}{% block content %}
-<h1>Settings &amp; API keys</h1>
-<p class="muted">Keys are encrypted in the database and never shown again after saving. Leave a secret field blank to keep its current value. Use <b>Test</b> after saving.</p>
+{% extends "base.html" %}{% from "partials/macros.html" import icon %}
+{% block title %}Settings · BD Lead Generation{% endblock %}
+{% block content %}
+<div class="page-head"><div class="grow"><h1>Settings &amp; API keys</h1>
+<div class="sub">Keys are encrypted in the database and never shown again after saving. Leave a secret field blank to keep its value. Save, then press <b>Test</b>.</div></div>
+<a class="btn" href="/setup">{{ icon('check') }} Setup checklist</a></div>
+<div class="tabs">{% for g in groups %}<a class="btn sm" href="#{{ g.id }}">{{ g.title }}{% if g.last_test %} <span class="dot" style="color:var(--{{ 'ok' if g.last_test.ok else 'err' }})"></span>{% endif %}</a>{% endfor %}</div>
 {% for g in groups %}
 <div class="card" id="{{ g.id }}">
-  <div class="row"><h2 class="grow">{{ g.title }}</h2>
-  {% if g.testable %}<button class="btn sm" data-post-json="/settings/test/{{ g.id }}" data-out="out-{{ g.id }}">Test</button>{% endif %}
-  {% if g.id == 'telegram' %}<button class="btn sm" data-post-json="/settings/telegram/detect" data-out="out-{{ g.id }}" data-reload="1">Detect chat ID</button>{% endif %}
+  <div class="card-head"><h2>{{ g.title }}</h2>
+    {% if g.last_test %}<span class="pill {{ 'ok' if g.last_test.ok else 'error' }}" title="{{ g.last_test.message }}">{{ 'Test passed' if g.last_test.ok else 'Test failed' }} · {{ g.last_test.at|local }}</span>{% endif %}
+    {% if g.testable %}<button class="btn sm" type="button" data-post-json="/settings/test/{{ g.id }}" data-out="out-{{ g.id }}">Test</button>{% endif %}
+    {% if g.id == 'telegram' %}<button class="btn sm" type="button" data-post-json="/settings/telegram/detect" data-out="out-{{ g.id }}" data-reload="1">Detect chat ID</button>{% endif %}
   </div>
-  <div class="small muted">{{ g.desc }}</div><div><span class="test-result" id="out-{{ g.id }}"></span></div>
+  <div class="small muted">{{ g.desc }}</div>
+  <div class="test-result" id="out-{{ g.id }}" role="status"></div>
   <form method="post" action="/settings/{{ g.id }}"><input type="hidden" name="csrf_token" value="{{ csrf }}">
-  <div class="grid g2">
+  <div class="grid g3">
   {% for f in g.fields %}{% set d = f.d %}
-    <div>
+    <div {% if d.kind in ('textarea', 'secret_textarea') %}style="grid-column:1/-1"{% endif %}>
     {% if d.kind == 'bool' %}
-      <label><input type="checkbox" name="{{ d.key }}" {{ 'checked' if f.value in ('true', True) }}> {{ d.label }}</label>
+      <label class="inline" style="margin-top:34px"><input type="checkbox" id="{{ d.key }}" name="{{ d.key }}" {{ 'checked' if f.value in ('true', True) }}> {{ d.label }}</label>
     {% else %}
-      <label>{{ d.label }} {% if d.secret %}<span class="pill {{ 'done' if f.is_set }}">{{ 'set ' ~ f.masked if f.is_set else 'not set' }}</span>{% endif %}</label>
+      <label for="{{ d.key }}">{{ d.label }} {% if d.secret %}<span class="pill {{ 'ok' if f.is_set }}">{{ 'saved ' ~ f.masked if f.is_set else 'not set' }}</span>{% endif %}</label>
       {% if d.kind == 'select' %}
-        <select name="{{ d.key }}">{% for o in d.options %}<option {{ 'selected' if f.value == o }}>{{ o }}</option>{% endfor %}</select>
+        <select id="{{ d.key }}" name="{{ d.key }}">{% for o in d.options %}<option {{ 'selected' if f.value == o }}>{{ o }}</option>{% endfor %}</select>
       {% elif d.kind in ('textarea', 'secret_textarea') %}
-        <textarea name="{{ d.key }}" class="code" placeholder="{{ 'paste to replace' if f.is_set and d.secret }}">{{ f.value }}</textarea>
+        <textarea id="{{ d.key }}" name="{{ d.key }}" class="code" placeholder="{{ 'Paste to replace the saved value' if f.is_set and d.secret }}">{{ f.value }}</textarea>
       {% elif d.secret %}
-        <input type="password" name="{{ d.key }}" autocomplete="new-password" placeholder="{{ 'paste new value to replace' if f.is_set else '' }}">
+        <input id="{{ d.key }}" type="password" name="{{ d.key }}" autocomplete="new-password" placeholder="{{ 'Paste a new value to replace' if f.is_set else '' }}">
       {% else %}
-        <input type="text" name="{{ d.key }}" value="{{ f.value }}">
+        <input id="{{ d.key }}" type="text" name="{{ d.key }}" value="{{ f.value }}">
       {% endif %}
-      {% if d.secret and f.is_set %}<label class="small" style="font-weight:400"><input type="checkbox" name="{{ d.key }}__clear"> clear this value</label>{% endif %}
+      {% if d.secret and f.is_set %}<label class="inline small" style="font-weight:400;margin-top:6px"><input type="checkbox" name="{{ d.key }}__clear"> Remove saved value</label>{% endif %}
     {% endif %}
     {% if d.help %}<div class="help">{{ d.help }}</div>{% endif %}
     </div>
   {% endfor %}
   </div>
-  <div style="margin-top:12px"><button class="btn primary">Save {{ g.title }}</button></div>
+  <div class="form-actions"><button class="btn primary">Save {{ g.title }}</button></div>
   </form>
 </div>
 {% endfor %}

@@ -155,3 +155,28 @@ def set_value(db: Session, key: str, value: str) -> None:
 def snapshot(db: Session) -> dict:
     """All settings as a typed dict (one DB round-trip per key is fine at this size)."""
     return {d.key: get(db, d.key) for d in DEFS}
+
+
+# ---- last "Test connection" result per group (shown in Settings and the setup checklist)
+def record_test(db: Session, group: str, ok: bool, message: str) -> None:
+    from datetime import datetime, timezone
+
+    key = f"_test:{group}"
+    row = db.get(Setting, key)
+    if row is None:
+        row = Setting(key=key, is_secret=False)
+        db.add(row)
+    row.value_encrypted = encrypt(f"{'ok' if ok else 'fail'}|{datetime.now(timezone.utc).isoformat()}|{message[:300]}")
+
+
+def test_results(db: Session) -> dict[str, dict]:
+    from datetime import datetime
+
+    out = {}
+    for row in db.query(Setting).filter(Setting.key.like("\\_test:%", escape="\\")):
+        try:
+            status, at, msg = decrypt(row.value_encrypted).split("|", 2)
+        except ValueError:
+            continue
+        out[row.key.split(":", 1)[1]] = {"ok": status == "ok", "at": datetime.fromisoformat(at), "message": msg}
+    return out
