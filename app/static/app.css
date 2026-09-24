@@ -126,6 +126,11 @@ pre{white-space:pre-wrap;word-break:break-word;background:var(--panel-2);padding
 .steps .error .mark{border-color:var(--err);color:var(--err)}
 .steps .untested .mark{border-color:var(--warn);color:var(--warn)}
 .steps .t{font-weight:600}.steps .w{color:var(--muted);font-size:12.5px}
+.steps li{align-items:start}.steps li>.btn,.steps li>.mark{margin-top:2px}
+.guide{margin-top:6px;font-size:13px}
+.guide summary{cursor:pointer;color:var(--info);font-weight:600;width:max-content}
+.guide ol{margin:8px 0 8px 18px;padding:0}.guide ol li{display:list-item;border:0;padding:2px 0}
+.guide .note{color:var(--muted);font-size:12.5px;margin-bottom:8px}
 
 /* ---------- chart ---------- */
 .chart{width:100%;height:auto;display:block}

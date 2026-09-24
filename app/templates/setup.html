@@ -7,11 +7,20 @@
   <div class="card-head"><h2>{{ done }} of {{ total }} required steps done</h2></div>
   <div class="bar"><span style="width:{{ (100 * done / total)|round|int }}%"></span></div>
   <ul class="steps" style="margin-top:10px">
+  {# open the guide of the first unfinished required step; the rest stay collapsed #}
+  {% set pending = [] %}{% for s in steps %}{% if s.state in ('todo', 'error') and not s.optional and s.guide %}{% set _ = pending.append(loop.index) %}{% endif %}{% endfor %}
+  {% set first_open = pending[0] if pending else 0 %}
   {% for s in steps %}
     <li class="{{ s.state }}"><span class="mark">{% if s.state == 'done' %}✓{% elif s.state == 'error' %}!{% else %}{{ loop.index }}{% endif %}</span>
       <div><div class="t">{{ s.title }} {% if s.optional %}<span class="pill">optional</span>{% endif %}
         {% if s.state == 'untested' %}<span class="pill untested">saved, not tested</span>{% elif s.state == 'error' %}<span class="pill error">test failed</span>{% endif %}</div>
-        <div class="w">{{ s.why }}{% if s.detail and s.state == 'error' %} — {{ s.detail }}{% endif %}</div></div>
+        <div class="w">{{ s.why }}{% if s.detail and s.state == 'error' %} — {{ s.detail }}{% endif %}</div>
+        {% if s.guide %}<details class="guide" {{ 'open' if s.state in ('todo', 'error') and not s.optional and loop.index == first_open }}>
+          <summary>How to get it</summary>
+          <ol>{% for step in s.guide.steps %}<li>{{ step }}</li>{% endfor %}</ol>
+          {% if s.guide.note %}<div class="note">{{ s.guide.note }}</div>{% endif %}
+          {% if s.guide.link %}<a class="btn sm" href="{{ s.guide.link[1] }}" target="_blank" rel="noopener">{{ s.guide.link[0] }} ↗</a>{% endif %}
+        </details>{% endif %}</div>
       <a class="btn sm {{ 'primary' if s.state != 'done' and not s.optional }}" href="{{ s.href }}">{{ 'Review' if s.state == 'done' else 'Set up' }}</a></li>
   {% endfor %}
   </ul>
