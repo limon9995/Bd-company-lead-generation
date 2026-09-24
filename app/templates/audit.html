@@ -1,0 +1,4 @@
+{% extends "base.html" %}{% block content %}
+<h1>Audit log</h1><div class="card table-wrap"><table><tr><th>When</th><th>User</th><th>Action</th><th>Entity</th><th>Detail</th></tr>
+{% for a in items %}<tr><td>{{ a.at|local }}</td><td>{{ emails.get(a.user_id, '') }}</td><td>{{ a.action }}</td><td>{{ a.entity }}</td><td class="small">{{ a.detail }}</td></tr>
+{% else %}<tr><td colspan="5" class="muted">Empty.</td></tr>{% endfor %}</table></div>{% endblock %}

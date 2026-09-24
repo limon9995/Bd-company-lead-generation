@@ -1,0 +1,19 @@
+{% extends "base.html" %}{% block content %}
+<div class="row"><h1 class="grow">Leads</h1>
+<a class="btn" href="/leads/export.csv?campaign={{ f.campaign }}&status={{ f.status }}&level={{ f.level }}&q={{ f.q|urlencode }}">Export CSV</a></div>
+<form class="card row" method="get">
+<select name="campaign" style="width:auto"><option value="">All campaigns</option>{% for c in campaigns %}<option value="{{ c.id }}" {{ 'selected' if f.campaign == c.id|string }}>{{ c.name }}</option>{% endfor %}</select>
+<select name="status" style="width:auto"><option value="">Any CRM status</option>{% for s in statuses %}<option {{ 'selected' if f.status == s }}>{{ s }}</option>{% endfor %}</select>
+<select name="level" style="width:auto"><option value="">Any confidence</option>{% for l in ['high','medium','low','none'] %}<option {{ 'selected' if f.level == l }}>{{ l }}</option>{% endfor %}</select>
+<input type="text" name="q" value="{{ f.q }}" placeholder="Search company / person / city" style="width:260px"><button class="btn">Filter</button></form>
+<div class="card table-wrap"><table><tr><th>Company</th><th>Decision maker</th><th>Contact</th><th>Confidence</th><th>CRM</th></tr>
+{% for l in items %}{% set co = l.company %}{% set p = l.primary_person %}<tr>
+<td><a href="/leads/{{ l.id }}"><b>{{ co.name }}</b></a><div class="small muted">{{ co.category }} · {{ co.city }}</div></td>
+<td>{% if p %}{{ p.full_name }}<div class="small muted">{{ p.title }}</div>{% else %}<span class="muted">not found</span>{% endif %}</td>
+<td class="small">{% if p and p.email %}{{ p.email }} <span class="pill">{{ p.email_status }}</span><br>{% elif co.generic_emails %}{{ co.generic_emails[0] }}<br>{% endif %}{{ co.phone }}</td>
+<td>{% if p %}<span class="pill {{ p.confidence|bucket }}">{{ p.confidence }} {{ p.confidence|bucket }}</span>{% endif %}</td>
+<td><span class="pill">{{ l.crm_status }}</span></td></tr>
+{% else %}<tr><td colspan="5" class="muted">No leads match.</td></tr>{% endfor %}</table>
+<div class="row" style="margin-top:10px">{% if page > 1 %}<a class="btn sm" href="?campaign={{ f.campaign }}&status={{ f.status }}&level={{ f.level }}&q={{ f.q|urlencode }}&page={{ page - 1 }}">← Prev</a>{% endif %}
+{% if has_next %}<a class="btn sm" href="?campaign={{ f.campaign }}&status={{ f.status }}&level={{ f.level }}&q={{ f.q|urlencode }}&page={{ page + 1 }}">Next →</a>{% endif %}</div></div>
+{% endblock %}

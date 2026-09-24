@@ -1,0 +1,37 @@
+{% extends "base.html" %}{% block content %}
+<h1>{{ company.name }}</h1>
+<div class="grid g2">
+<div class="card"><h2>Company</h2><table>
+<tr><th>Category</th><td>{{ company.category }}</td></tr><tr><th>Address</th><td>{{ company.address }}</td></tr>
+<tr><th>Phone</th><td>{{ company.phone }} {% for p in company.extra_phones %}<div class="small">{{ p }}</div>{% endfor %}</td></tr>
+<tr><th>Website</th><td>{% if company.website %}<a href="{{ company.website }}" target="_blank" rel="noopener">{{ company.website }}</a>{% endif %}</td></tr>
+<tr><th>Emails on site</th><td>{{ company.generic_emails|join(', ') }}</td></tr>
+<tr><th>Socials</th><td>{% for k, v in (company.socials or {}).items() %}<div><a href="{{ v }}" target="_blank" rel="noopener">{{ k }}</a></div>{% endfor %}</td></tr>
+<tr><th>Google Maps</th><td>{% if company.google_maps_url %}<a href="{{ company.google_maps_url }}" target="_blank" rel="noopener">open</a>{% endif %} {% if company.rating %}· ★ {{ company.rating }} ({{ company.reviews_count }}){% endif %}</td></tr>
+<tr><th>Pages crawled</th><td class="small">{% for p in company.crawled_pages %}<div><a href="{{ p.url }}" target="_blank" rel="noopener">{{ p.title or p.url }}</a></div>{% else %}<span class="muted">none</span>{% endfor %}</td></tr>
+</table></div>
+<div class="card"><h2>CRM</h2>
+<form method="post" action="/leads/{{ lead.id }}"><input type="hidden" name="csrf_token" value="{{ csrf }}">
+<label>Status</label><select name="crm_status">{% for s in statuses %}<option {{ 'selected' if lead.crm_status == s }}>{{ s }}</option>{% endfor %}</select>
+<label>Primary decision maker</label><select name="primary_person_id"><option value="">—</option>{% for p in people %}<option value="{{ p.id }}" {{ 'selected' if lead.primary_person_id == p.id }}>{{ p.full_name }} — {{ p.title }} ({{ p.confidence }})</option>{% endfor %}</select>
+<label>Owner</label><input type="text" name="owner" value="{{ lead.owner }}">
+<label>Notes</label><textarea name="notes">{{ lead.notes }}</textarea>
+<div style="margin-top:10px"><button class="btn primary">Save</button></div></form>
+<hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
+<form method="post" action="/leads/{{ lead.id }}/draft" class="row"><input type="hidden" name="csrf_token" value="{{ csrf }}">
+<select name="template_id" style="width:auto">{% for t in templates_ %}<option value="{{ t.id }}">{{ t.name }}</option>{% endfor %}</select>
+<input type="email" name="to_email" placeholder="to (optional override)" style="width:220px"><button class="btn">Create email draft</button></form>
+</div></div>
+<div class="card"><h2>Decision makers found</h2>
+<p class="small muted">Every person is kept only if their name appears in the source text. Check the source before contacting.</p>
+<div class="table-wrap"><table><tr><th>Name / title</th><th>Email</th><th>Confidence</th><th>Why</th><th>Evidence / source</th></tr>
+{% for p in people %}<tr><td><b>{{ p.full_name }}</b><div class="small muted">{{ p.title }}</div>{% if p.linkedin_url %}<a class="small" href="{{ p.linkedin_url }}" target="_blank" rel="noopener">LinkedIn (public)</a>{% endif %}</td>
+<td class="small">{{ p.email }} {% if p.email %}<span class="pill">{{ p.email_status }}</span>{% endif %}</td>
+<td><span class="pill {{ p.confidence|bucket }}">{{ p.confidence }}</span></td>
+<td class="small">{% for w in p.confidence_breakdown %}<div>{{ w }}</div>{% endfor %}</td>
+<td class="small">{% if p.evidence %}“{{ p.evidence }}”<br>{% endif %}{% for s in p.sources %}<a href="{{ s.url }}" target="_blank" rel="noopener">{{ s.kind }}</a> {% endfor %}</td></tr>
+{% else %}<tr><td colspan="5" class="muted">No decision maker found for this company.</td></tr>{% endfor %}</table></div></div>
+<div class="card"><h2>Emails</h2><table><tr><th>#</th><th>To</th><th>Subject</th><th>Status</th><th>Sent</th></tr>
+{% for m in messages %}<tr><td><a href="/outbox/{{ m.id }}">#{{ m.id }}</a></td><td>{{ m.to_email }}</td><td>{{ m.subject }}</td><td><span class="pill {{ m.status }}">{{ m.status }}</span></td><td>{{ m.sent_at|local }}</td></tr>
+{% else %}<tr><td colspan="5" class="muted">None.</td></tr>{% endfor %}</table></div>
+{% endblock %}

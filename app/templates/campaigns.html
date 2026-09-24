@@ -1,0 +1,12 @@
+{% extends "base.html" %}{% block content %}
+<div class="row"><h1 class="grow">Campaigns</h1><a class="btn primary" href="/campaigns/new">New campaign</a></div>
+<div class="card table-wrap"><table><tr><th>Name</th><th>Industry</th><th>Cities</th><th>Schedule</th><th>Leads</th><th>Last run</th><th>Email</th><th></th></tr>
+{% for r in rows %}{% set c = r.c %}<tr>
+<td><b>{{ c.name }}</b>{% if not c.is_active %} <span class="pill">paused</span>{% endif %}</td><td>{{ c.industry_slug }}</td><td>{{ c.cities|join(', ') }}</td>
+<td class="mono">{{ c.schedule_cron or 'manual' }}</td><td><a href="/leads?campaign={{ c.id }}">{{ r.leads }}</a></td>
+<td>{% if r.last %}<a href="/runs/{{ r.last.id }}">#{{ r.last.id }}</a> <span class="pill {{ r.last.status }}">{{ r.last.status }}</span>{% else %}<span class="muted">never</span>{% endif %}</td>
+<td>{{ 'auto' if c.auto_email else ('drafts' if c.email_template_id else 'off') }}</td>
+<td class="row"><form method="post" action="/campaigns/{{ c.id }}/run"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="btn sm primary">Run now</button></form>
+<a class="btn sm" href="/campaigns/{{ c.id }}/edit">Edit</a></td></tr>
+{% else %}<tr><td colspan="8" class="muted">No campaigns yet.</td></tr>{% endfor %}</table></div>
+{% endblock %}

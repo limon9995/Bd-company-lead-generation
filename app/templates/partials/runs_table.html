@@ -1,0 +1,4 @@
+<div class="table-wrap"><table><tr><th>#</th><th>Status</th><th>Trigger</th><th>Started</th><th>Companies</th><th>DM found</th><th>With email</th></tr>
+{% for r in runs %}<tr><td><a href="/runs/{{ r.id }}">#{{ r.id }}</a></td><td><span class="pill {{ r.status }}">{{ r.status }}</span></td>
+<td>{{ r.trigger }}</td><td>{{ r.started_at|local }}</td><td>{{ r.counters.get('companies', 0) }}</td><td>{{ r.counters.get('dm_found', 0) }}</td><td>{{ r.counters.get('with_email', 0) }}</td></tr>
+{% else %}<tr><td colspan="7" class="muted">No runs yet.</td></tr>{% endfor %}</table></div>

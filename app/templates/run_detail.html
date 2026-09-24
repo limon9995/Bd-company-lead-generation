@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% block content %}
+<div class="row"><h1 class="grow">Run #{{ run.id }} · {{ campaign.name if campaign }} <span class="pill {{ run.status }}">{{ run.status }}</span></h1>
+{% if run.status == 'running' %}<a class="btn" href="/runs/{{ run.id }}">Refresh</a>{% endif %}
+<form method="post" action="/runs/{{ run.id }}/sync-sheet"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="btn">Sync to Sheet</button></form>
+<a class="btn" href="/leads?campaign={{ run.campaign_id }}">View leads</a></div>
+<div class="grid g2">
+<div class="card"><h2>Counters</h2><table>{% for k, v in (run.counters or {}).items() %}<tr><th>{{ k.replace('_', ' ') }}</th><td>{{ v }}</td></tr>{% else %}<tr><td class="muted">{{ 'Nothing yet — is the worker running?' if run.status == 'running' else 'No companies processed.' }}</td></tr>{% endfor %}</table></div>
+<div class="card"><h2>Jobs ({{ total_jobs }})</h2><table>{% for k, v in by_status.items() %}<tr><th>{{ k }}</th><td>{{ v }}</td></tr>{% endfor %}</table>
+{% if by_status.get('failed') or by_status.get('skipped') %}<form method="post" action="/runs/{{ run.id }}/retry-failed" style="margin-top:10px"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="btn primary">Retry failed / skipped</button></form>{% endif %}
+<p class="small muted">Started {{ run.started_at|local }}{% if run.finished_at %} · finished {{ run.finished_at|local }}{% endif %}</p></div></div>
+{% if run.notes %}<div class="card"><h2>Notes</h2>{% for n in run.notes %}<div class="warn">{{ n }}</div>{% endfor %}</div>{% endif %}
+{% if run.plan %}<div class="card"><h2>Search plan</h2><div class="small">{% for q in run.plan %}<span class="pill" style="margin:2px">{{ q }}</span>{% endfor %}</div></div>{% endif %}
+{% if problems %}<div class="card"><h2>Problems</h2><div class="table-wrap"><table><tr><th>Job</th><th>Type</th><th>Status</th><th>Attempts</th><th>Error</th></tr>
+{% for j in problems %}<tr><td>#{{ j.id }}</td><td>{{ j.type }}</td><td><span class="pill {{ j.status }}">{{ j.status }}</span></td><td>{{ j.attempts }}</td><td><pre class="small">{{ j.last_error[:800] }}</pre></td></tr>{% endfor %}</table></div></div>{% endif %}
+{% endblock %}

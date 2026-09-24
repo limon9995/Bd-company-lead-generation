@@ -1,0 +1,11 @@
+{% extends "base.html" %}{% block content %}
+<h1>{{ 'Edit' if t else 'New' }} template</h1>
+<form class="card" method="post" action="{{ '/templates/' ~ t.id if t else '/templates' }}"><input type="hidden" name="csrf_token" value="{{ csrf }}">
+<label>Name</label><input type="text" name="name" value="{{ t.name if t }}" required>
+<label>Subject</label><input type="text" name="subject_tpl" value="{{ t.subject_tpl if t }}" required>
+<label>Body</label><textarea name="body_tpl" style="min-height:240px" required>{{ t.body_tpl if t }}</textarea>
+<div class="help">Variables: {% for v in vars %}<span class="mono">{{ '{{' }}{{ v }}{{ '}}' }}</span> {% endfor %}. Signature and unsubscribe footer are added automatically.</div>
+<label><input type="checkbox" name="use_ai_personalisation" {{ 'checked' if not t or t.use_ai_personalisation }}> Let Gemini write <span class="mono">{{ '{{personal_line}}' }}</span> (one opening sentence, facts only)</label>
+<label>What you offer (context for the AI line)</label><textarea name="ai_instructions">{{ t.ai_instructions if t }}</textarea>
+<div style="margin-top:12px"><button class="btn primary">Save</button> <a class="btn" href="/templates">Cancel</a></div>
+</form>{% endblock %}

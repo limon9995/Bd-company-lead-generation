@@ -1,0 +1,21 @@
+{% extends "base.html" %}{% block content %}
+<h1>{{ 'Edit' if c else 'New' }} campaign</h1>
+<form class="card" method="post" action="{{ '/campaigns/' ~ c.id if c else '/campaigns' }}"><input type="hidden" name="csrf_token" value="{{ csrf }}">
+<div class="grid g2">
+<div><label>Name</label><input type="text" name="name" value="{{ c.name if c }}" placeholder="Healthcare – Dhaka" required></div>
+<div><label>Target industry (switch here)</label><select name="industry_slug">
+{% for p in presets %}<option value="{{ p.slug }}" {{ 'selected' if c and c.industry_slug == p.slug }}>{{ p.name }}</option>{% endfor %}</select>
+<div class="help">Change this to switch the market, e.g. Healthcare → Education. <a href="/industries">Manage industries</a></div></div>
+<div><label>Cities</label><input type="text" name="cities" value="{{ c.cities|join(', ') if c else 'Dhaka' }}"><div class="help">Comma separated, e.g. Dhaka, Chattogram, Sylhet</div></div>
+<div><label>Max companies per run</label><input type="number" name="max_companies_per_run" value="{{ c.max_companies_per_run if c else 50 }}" min="1" max="1000"></div>
+<div><label>Extra search phrases (optional)</label><input type="text" name="extra_keywords" value="{{ c.extra_keywords|join(', ') if c }}" placeholder="eye hospital, dental clinic"></div>
+<div><label>Decision-maker titles (optional override)</label><input type="text" name="target_titles" value="{{ c.target_titles|join(', ') if c }}" placeholder="leave empty to use the industry defaults"></div>
+<div><label>Schedule (cron, {{ tz }})</label><input type="text" name="schedule_cron" value="{{ c.schedule_cron if c }}" placeholder="e.g. 0 9 * * 0  = Sundays 09:00"><div class="help">Empty = manual "Run now" only. Format: minute hour day month weekday.</div></div>
+<div><label>Email template</label><select name="email_template_id"><option value="">— no emails —</option>
+{% for t in templates_ %}<option value="{{ t.id }}" {{ 'selected' if c and c.email_template_id == t.id }}>{{ t.name }}</option>{% endfor %}</select>
+<label><input type="checkbox" name="auto_email" {{ 'checked' if c and c.auto_email }}> Auto-approve high-confidence leads with a real (non-guessed) email</label>
+<div class="help">Otherwise drafts wait in the Outbox for your approval.</div></div>
+</div>
+{% if c %}<label><input type="checkbox" name="is_active" {{ 'checked' if c.is_active }}> Active (scheduled runs enabled)</label>{% endif %}
+<div style="margin-top:12px"><button class="btn primary">Save</button> <a class="btn" href="/campaigns">Cancel</a></div>
+</form>{% endblock %}

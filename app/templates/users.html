@@ -1,0 +1,12 @@
+{% extends "base.html" %}{% block content %}
+<h1>Users</h1>
+<div class="grid g2">
+<div class="card"><h2>Admins</h2><table><tr><th>Email</th><th>Status</th><th>Last login</th><th></th></tr>
+{% for u in users %}<tr><td>{{ u.email }}</td><td>{{ 'active' if u.is_active else 'disabled' }}</td><td>{{ u.last_login|local }}</td>
+<td>{% if u.id != me.id %}<form method="post" action="/users/{{ u.id }}/toggle"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="btn sm">{{ 'Disable' if u.is_active else 'Enable' }}</button></form>{% endif %}</td></tr>{% endfor %}</table></div>
+<div class="card"><h2>Add admin</h2><form method="post" action="/users"><input type="hidden" name="csrf_token" value="{{ csrf }}">
+<label>Email</label><input type="email" name="email" required><label>Password (10+ chars)</label><input type="password" name="password" minlength="10" required>
+<div style="margin-top:10px"><button class="btn primary">Add</button></div></form>
+<h2 style="margin-top:20px">Change my password</h2><form method="post" action="/account/password"><input type="hidden" name="csrf_token" value="{{ csrf }}">
+<label>Current</label><input type="password" name="current" required><label>New</label><input type="password" name="new" minlength="10" required>
+<div style="margin-top:10px"><button class="btn">Change</button></div></form></div></div>{% endblock %}

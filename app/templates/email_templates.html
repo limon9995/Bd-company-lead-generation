@@ -1,0 +1,5 @@
+{% extends "base.html" %}{% block content %}
+<div class="row"><h1 class="grow">Email templates</h1><a class="btn primary" href="/templates/new">New template</a></div>
+<div class="card table-wrap"><table><tr><th>Name</th><th>Subject</th><th>AI line</th><th></th></tr>
+{% for t in items %}<tr><td>{{ t.name }}</td><td>{{ t.subject_tpl }}</td><td>{{ 'yes' if t.use_ai_personalisation else 'no' }}</td><td><a class="btn sm" href="/templates/{{ t.id }}/edit">Edit</a></td></tr>{% endfor %}</table></div>
+{% endblock %}

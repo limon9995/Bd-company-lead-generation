@@ -1,0 +1,38 @@
+{% extends "base.html" %}{% block content %}
+<h1>Settings &amp; API keys</h1>
+<p class="muted">Keys are encrypted in the database and never shown again after saving. Leave a secret field blank to keep its current value. Use <b>Test</b> after saving.</p>
+{% for g in groups %}
+<div class="card" id="{{ g.id }}">
+  <div class="row"><h2 class="grow">{{ g.title }}</h2>
+  {% if g.testable %}<button class="btn sm" data-post-json="/settings/test/{{ g.id }}" data-out="out-{{ g.id }}">Test</button>{% endif %}
+  {% if g.id == 'telegram' %}<button class="btn sm" data-post-json="/settings/telegram/detect" data-out="out-{{ g.id }}" data-reload="1">Detect chat ID</button>{% endif %}
+  </div>
+  <div class="small muted">{{ g.desc }}</div><div><span class="test-result" id="out-{{ g.id }}"></span></div>
+  <form method="post" action="/settings/{{ g.id }}"><input type="hidden" name="csrf_token" value="{{ csrf }}">
+  <div class="grid g2">
+  {% for f in g.fields %}{% set d = f.d %}
+    <div>
+    {% if d.kind == 'bool' %}
+      <label><input type="checkbox" name="{{ d.key }}" {{ 'checked' if f.value in ('true', True) }}> {{ d.label }}</label>
+    {% else %}
+      <label>{{ d.label }} {% if d.secret %}<span class="pill {{ 'done' if f.is_set }}">{{ 'set ' ~ f.masked if f.is_set else 'not set' }}</span>{% endif %}</label>
+      {% if d.kind == 'select' %}
+        <select name="{{ d.key }}">{% for o in d.options %}<option {{ 'selected' if f.value == o }}>{{ o }}</option>{% endfor %}</select>
+      {% elif d.kind in ('textarea', 'secret_textarea') %}
+        <textarea name="{{ d.key }}" class="code" placeholder="{{ 'paste to replace' if f.is_set and d.secret }}">{{ f.value }}</textarea>
+      {% elif d.secret %}
+        <input type="password" name="{{ d.key }}" autocomplete="new-password" placeholder="{{ 'paste new value to replace' if f.is_set else '' }}">
+      {% else %}
+        <input type="text" name="{{ d.key }}" value="{{ f.value }}">
+      {% endif %}
+      {% if d.secret and f.is_set %}<label class="small" style="font-weight:400"><input type="checkbox" name="{{ d.key }}__clear"> clear this value</label>{% endif %}
+    {% endif %}
+    {% if d.help %}<div class="help">{{ d.help }}</div>{% endif %}
+    </div>
+  {% endfor %}
+  </div>
+  <div style="margin-top:12px"><button class="btn primary">Save {{ g.title }}</button></div>
+  </form>
+</div>
+{% endfor %}
+{% endblock %}

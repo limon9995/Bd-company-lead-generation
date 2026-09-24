@@ -1,0 +1,14 @@
+{% extends "base.html" %}{% block content %}
+<h1>Email #{{ m.id }} <span class="pill {{ m.status }}">{{ m.status }}</span></h1>
+<p><a href="/leads/{{ m.lead_id }}">← {{ m.lead.company.name }}</a></p>
+{% if m.error %}<div class="flash err">{{ m.error }}</div>{% endif %}
+<form class="card" method="post" action="/outbox/{{ m.id }}"><input type="hidden" name="csrf_token" value="{{ csrf }}">
+<label>To</label><input type="email" name="to_email" value="{{ m.to_email }}" {{ 'readonly' if m.status == 'sent' }} required>
+<label>Subject</label><input type="text" name="subject" value="{{ m.subject }}" required>
+<label>Body</label><textarea name="body" style="min-height:320px">{{ m.body }}</textarea>
+<label>Don't send before (optional, {{ tz }})</label><input type="datetime-local" name="not_before" value="{{ m.not_before|local('%Y-%m-%dT%H:%M') if m.not_before }}" style="width:260px">
+{% if m.status != 'sent' %}<div class="row" style="margin-top:12px">
+<button class="btn primary" name="action" value="approve">Save &amp; approve</button>
+<button class="btn" name="action" value="draft">Save as draft</button>
+<button class="btn danger" name="action" value="cancel">Cancel email</button></div>{% else %}<p class="muted">Sent {{ m.sent_at|local }}</p>{% endif %}
+</form>{% endblock %}

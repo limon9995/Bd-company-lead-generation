@@ -1,0 +1,8 @@
+{% extends "base.html" %}{% block content %}
+<h1>Suppression list</h1><p class="muted">Nobody on this list is emailed. Unsubscribes and hard bounces are added automatically.</p>
+<form class="card row" method="post" action="/suppression"><input type="hidden" name="csrf_token" value="{{ csrf }}">
+<input type="text" name="value" placeholder="name@company.com or @company.com" style="width:320px"><button class="btn primary">Add</button></form>
+<div class="card table-wrap"><table><tr><th>Email / domain</th><th>Reason</th><th>Added</th><th></th></tr>
+{% for s in items %}<tr><td>{{ s.value }}</td><td>{{ s.reason }}</td><td>{{ s.created_at|local }}</td>
+<td><form method="post" action="/suppression/{{ s.id }}/delete" data-confirm="Remove {{ s.value }}?"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="btn sm danger">Remove</button></form></td></tr>
+{% else %}<tr><td colspan="4" class="muted">Empty.</td></tr>{% endfor %}</table></div>{% endblock %}

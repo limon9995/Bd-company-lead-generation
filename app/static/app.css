@@ -1,0 +1,37 @@
+:root{--bg:#f6f7f9;--panel:#fff;--text:#1d2330;--muted:#667085;--line:#e4e7ec;--accent:#0f6b4f;--accent-2:#e8f4ef;
+--err:#b42318;--err-bg:#fef3f2;--warn:#b54708;--warn-bg:#fffaeb;--ok-bg:#ecfdf3;--radius:10px}
+@media (prefers-color-scheme:dark){:root{--bg:#12151b;--panel:#1a1f27;--text:#e6e8ec;--muted:#98a2b3;--line:#2b323d;
+--accent:#3fbf8f;--accent-2:#16322a;--err:#f97066;--err-bg:#3a1a18;--warn:#fdb022;--warn-bg:#3a2c10;--ok-bg:#12321f}}
+*{box-sizing:border-box}body{margin:0;font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans Bengali",sans-serif;background:var(--bg);color:var(--text)}
+a{color:var(--accent);text-decoration:none}a:hover{text-decoration:underline}
+.layout{display:flex;min-height:100vh}
+nav.side{width:210px;flex-shrink:0;background:var(--panel);border-right:1px solid var(--line);padding:16px 10px;position:sticky;top:0;height:100vh;overflow:auto}
+nav.side .brand{font-weight:700;font-size:15px;padding:4px 10px 14px}
+nav.side a{display:block;padding:7px 10px;border-radius:8px;color:var(--text)}
+nav.side a.on,nav.side a:hover{background:var(--accent-2);text-decoration:none}
+nav.side .sep{height:1px;background:var(--line);margin:10px 4px}
+main{flex:1;padding:22px 28px;max-width:1300px;min-width:0}
+h1{font-size:21px;margin:0 0 16px}h2{font-size:16px;margin:0 0 10px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;margin-bottom:16px}
+.grid{display:grid;gap:14px}.g4{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}.g2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.stat .n{font-size:26px;font-weight:700}.stat .l{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.03em}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:8px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+.table-wrap{overflow-x:auto}
+label{display:block;font-weight:600;margin:10px 0 4px}.help{color:var(--muted);font-size:12px;margin-top:3px}
+input[type=text],input[type=email],input[type=password],input[type=number],input[type=datetime-local],select,textarea{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--text);font:inherit}
+textarea{min-height:90px}textarea.code{font-family:ui-monospace,Menlo,monospace;font-size:12px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.row>*{flex:0 0 auto}.grow{flex:1 1 auto}
+.btn{display:inline-block;padding:7px 14px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--text);cursor:pointer;font:inherit;font-weight:600}
+.btn:hover{text-decoration:none;border-color:var(--accent)}.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.danger{color:var(--err)}.btn.sm{padding:4px 10px;font-size:12px}
+.flash{padding:10px 14px;border-radius:8px;margin-bottom:12px;background:var(--ok-bg)}.flash.err{background:var(--err-bg);color:var(--err)}
+.warn{background:var(--warn-bg);color:var(--warn);padding:10px 14px;border-radius:8px;margin-bottom:8px}
+.pill{display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;font-weight:600;background:var(--line)}
+.pill.high{background:#d1fadf;color:#05603a}.pill.medium{background:#fef0c7;color:#93370d}.pill.low{background:#fee4e2;color:#912018}
+.pill.done,.pill.sent,.pill.approved{background:#d1fadf;color:#05603a}.pill.failed{background:#fee4e2;color:#912018}.pill.running,.pill.queued{background:#d1e9ff;color:#1849a9}
+.muted{color:var(--muted)}.small{font-size:12px}.mono{font-family:ui-monospace,Menlo,monospace;font-size:12px}
+.test-result{margin-left:8px;font-size:13px}.test-result.ok{color:var(--accent)}.test-result.err{color:var(--err)}
+pre{white-space:pre-wrap;word-break:break-word;background:var(--bg);padding:10px;border-radius:8px;border:1px solid var(--line);max-height:420px;overflow:auto}
+.login{max-width:360px;margin:12vh auto}
+@media (max-width:800px){.layout{display:block}nav.side{width:auto;height:auto;position:static;display:flex;flex-wrap:wrap;gap:4px}nav.side .sep,nav.side .brand{display:none}main{padding:16px}}

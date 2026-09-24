@@ -1,0 +1,65 @@
+# Usage:  cp .env.example .env  (fill it)  →  docker compose up -d --build
+# HTTPS with your own (sub)domain: set DOMAIN in .env and run  docker compose --profile https up -d
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-leadgen}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-leadgen}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-leadgen}"]
+      interval: 5s
+      retries: 20
+
+  web:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-leadgen}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-leadgen}
+    depends_on:
+      db: {condition: service_healthy}
+    ports: ["${WEB_BIND:-127.0.0.1}:8000:8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      retries: 30
+
+  worker:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-leadgen}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-leadgen}
+    command: ["python", "-m", "app.worker"]
+    shm_size: "1gb"   # Chromium needs more than Docker's 64MB default
+    depends_on:
+      web: {condition: service_healthy}   # web runs the migrations
+
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes: [./backups:/backups]
+    depends_on:
+      db: {condition: service_healthy}
+    # daily dump, keep 7 days
+    entrypoint: ["sh", "-c", "while true; do pg_dump -h db -U ${POSTGRES_USER:-leadgen} ${POSTGRES_DB:-leadgen} | gzip > /backups/leadgen-$$(date +%F).sql.gz; find /backups -name '*.sql.gz' -mtime +7 -delete; sleep 86400; done"]
+
+  caddy:
+    image: caddy:2-alpine
+    profiles: [https]
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      DOMAIN: ${DOMAIN:-}
+    volumes: [./Caddyfile:/etc/caddy/Caddyfile:ro, caddy_data:/data]
+    depends_on: [web]
+
+volumes:
+  pgdata:
+  caddy_data:

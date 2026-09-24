@@ -1,0 +1,37 @@
+# Industry presets ("switch node"). Editable later from Admin → Industries.
+# places_queries are combined with each campaign city: "<query> in <city>, Bangladesh".
+- slug: healthcare
+  name: Healthcare
+  places_queries: [hospital, diagnostic center, clinic, pharmaceutical company, medical college hospital]
+  default_titles: [Managing Director, Chairman, CEO, Director, Hospital Director, Superintendent, Administrator]
+  pitch_context: hospitals, clinics and diagnostic centres
+- slug: education
+  name: Education
+  places_queries: [private university, english medium school, college, coaching center, training institute]
+  default_titles: [Chairman, Vice Chancellor, Principal, Founder, Director, Registrar, Head of School]
+  pitch_context: schools, universities and training institutes
+- slug: real_estate
+  name: Real Estate
+  places_queries: [real estate developer, property developer, construction company, apartment developer]
+  default_titles: [Managing Director, Chairman, CEO, Director, Founder, General Manager]
+  pitch_context: real-estate developers
+- slug: tech
+  name: Technology / Software
+  places_queries: [software company, IT company, digital agency, web development company]
+  default_titles: [CEO, Founder, Co-Founder, Managing Director, CTO, Director]
+  pitch_context: software and IT companies
+- slug: garments
+  name: Garments / RMG
+  places_queries: [garments factory, apparel manufacturer, buying house, textile mill]
+  default_titles: [Managing Director, Chairman, Director, CEO, General Manager]
+  pitch_context: garment manufacturers and buying houses
+- slug: hospitality
+  name: Hotels & Restaurants
+  places_queries: [hotel, resort, restaurant, catering service]
+  default_titles: [Managing Director, Owner, General Manager, CEO, Director]
+  pitch_context: hotels, resorts and restaurants
+- slug: ecommerce
+  name: E-commerce / Retail
+  places_queries: [ecommerce company, online shop, supermarket, retail chain]
+  default_titles: [CEO, Founder, Managing Director, Head of Operations]
+  pitch_context: e-commerce and retail businesses

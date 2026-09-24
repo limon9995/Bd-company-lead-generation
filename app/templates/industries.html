@@ -1,0 +1,7 @@
+{% extends "base.html" %}{% block content %}
+<div class="row"><h1 class="grow">Industries</h1><a class="btn primary" href="/industries/new">Add industry</a></div>
+<p class="muted">An industry preset is the "switch": it holds the Google Places search phrases and the decision-maker titles. Pick it in a campaign to target that market.</p>
+<div class="card table-wrap"><table><tr><th>Name</th><th>Slug</th><th>Search phrases</th><th>Target titles</th><th></th></tr>
+{% for p in presets %}<tr><td><b>{{ p.name }}</b></td><td class="mono">{{ p.slug }}</td><td>{{ p.places_queries|join(', ') }}</td>
+<td>{{ p.default_titles|join(', ') }}</td><td><a class="btn sm" href="/industries/{{ p.id }}/edit">Edit</a></td></tr>{% endfor %}</table></div>
+{% endblock %}

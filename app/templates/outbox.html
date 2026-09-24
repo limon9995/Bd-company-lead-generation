@@ -1,0 +1,11 @@
+{% extends "base.html" %}{% block content %}
+<div class="row"><h1 class="grow">Outbox</h1>
+{% if status == 'draft' and items %}<form method="post" action="/outbox/approve-all" data-confirm="Approve all drafts for sending?"><input type="hidden" name="csrf_token" value="{{ csrf }}"><button class="btn primary">Approve all drafts</button></form>{% endif %}</div>
+{% if not smtp_ready %}<div class="warn">SMTP is not configured — approved emails will not be sent. <a href="/settings#smtp">Settings → Email sending</a></div>{% endif %}
+<p class="muted">Send window is {{ 'OPEN' if window_open else 'closed' }} now · sent today {{ sent_today }}/{{ cap }}. The worker sends one approved email at a time with a random gap.</p>
+<div class="row" style="margin-bottom:12px">{% for s in statuses %}<a class="btn sm {{ 'primary' if s == status }}" href="/outbox?status={{ s }}">{{ s }}</a>{% endfor %}</div>
+<div class="card table-wrap"><table><tr><th>#</th><th>To</th><th>Subject</th><th>Company</th><th>Updated</th><th>Error</th></tr>
+{% for m in items %}<tr><td><a href="/outbox/{{ m.id }}">#{{ m.id }}</a></td><td>{{ m.to_email }}</td><td>{{ m.subject }}</td>
+<td><a href="/leads/{{ m.lead_id }}">{{ m.lead.company.name }}</a></td><td>{{ (m.sent_at or m.updated_at)|local }}</td><td class="small">{{ m.error }}</td></tr>
+{% else %}<tr><td colspan="6" class="muted">Nothing here.</td></tr>{% endfor %}</table></div>
+{% endblock %}
