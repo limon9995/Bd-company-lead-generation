@@ -33,7 +33,7 @@
       </select><div class="help">Used by Google Maps (browser) and browser search.</div></div>
     <div><label for="search_provider">Decision-maker search</label>
       <select id="search_provider" name="search_provider">
-        {% for v, t in [('', 'Settings default'), ('serper', 'Serper API (key)'), ('brave', 'Brave API (key)'), ('duckduckgo', 'DuckDuckGo (browser, free)'), ('bing', 'Bing (browser, free)'), ('none', 'Off - websites only')] %}
+        {% for v, t in [('', 'Settings default'), ('auto', 'Auto: Serper, then Brave, then DuckDuckGo/Bing (free)'), ('serper', 'Serper API (key)'), ('brave', 'Brave API (key)'), ('duckduckgo', 'DuckDuckGo (browser, free)'), ('bing', 'Bing (browser, free)'), ('none', 'Off - websites only')] %}
         <option value="{{ v }}" {{ 'selected' if (c.search_provider if c else '') == v }}>{{ t }}</option>{% endfor %}
       </select></div>
     <div><label>When a site blocks the browser</label>

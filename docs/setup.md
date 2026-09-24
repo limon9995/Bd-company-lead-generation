@@ -28,7 +28,7 @@ Restore: `gunzip -c backups/leadgen-DATE.sql.gz | docker compose exec -T db psql
 | Service | Where | Notes |
 |---|---|---|
 | Google Places API | console.cloud.google.com → new project → enable **Places API (New)** → Credentials → API key | Needs a billing account (card). Restrict the key to Places API. |
-| Serper.dev (search) | serper.dev → sign up → API key | 2,500 free queries. Or Brave Search API. Optional but improves decision-maker coverage. |
+| Serper.dev (search) | serper.dev → sign up → API key | 2,500 free queries. Or Brave Search API. Optional but improves decision-maker coverage. Provider `auto` (default) uses Serper, then Brave when Serper's credits run out, then DuckDuckGo/Bing in the browser; results are reused for 30 days (Settings → Web search) so a repeated query costs nothing. |
 | Gemini | aistudio.google.com → Get API key | Free tier is rate-limited and Google may use free-tier data to improve its products; enable billing for paid tier. Press **Test**: if the model name is wrong it lists the models your key can use. |
 | Telegram | Telegram → @BotFather → /newbot → token | Send `/start` to the bot → **Detect chat ID**. For a group: add bot to group, send a message, detect. |
 | Gmail SMTP | Google Account → Security → 2-Step Verification ON → **App passwords** → create | host `smtp.gmail.com`, port `587`, username = the Gmail address, password = the 16-char app password. Use a separate Gmail account for outreach. |

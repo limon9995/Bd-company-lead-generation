@@ -113,7 +113,7 @@ def campaign_save(request: Request, cid: int | None = None, name: str = Form(...
     c.directory_max_pages = max(1, min(int(directory_max_pages), 50))
     c.directory_agent = bool(directory_agent)
     c.browser_style = browser_style if browser_style in ("", "type", "url") else ""
-    c.search_provider = search_provider if search_provider in ("", "serper", "brave", "duckduckgo", "bing", "none") else ""
+    c.search_provider = search_provider if search_provider in ("", "auto", "serper", "brave", "duckduckgo", "bing", "none") else ""
     c.on_block = on_block if on_block in ("fallback", "pause") else "fallback"
     if c.discovery_source == "directory" and not c.directory_urls:
         flash(request, "Add at least one directory URL (starting with https://) for a directory campaign.", "err")

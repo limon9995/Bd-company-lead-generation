@@ -48,10 +48,14 @@ DEFS: list[SettingDef] = [
     SettingDef("places_cost_per_call", "Est. cost per call (USD)", "places", "float", default="0.035",
                help="Estimate only, used for the dashboard. Check Google's current Places pricing and update."),
 
-    SettingDef("search_provider", "Provider", "search", "select", default="serper", options=("serper", "brave", "duckduckgo", "bing", "none"),
-               help="duckduckgo / bing = browser mode, no key needed, but slower and can be blocked."),
-    SettingDef("serper_api_key", "Serper.dev API key", "search", "secret"),
-    SettingDef("brave_api_key", "Brave Search API key", "search", "secret"),
+    SettingDef("search_provider", "Provider", "search", "select", default="auto",
+               options=("auto", "serper", "brave", "duckduckgo", "bing", "none"),
+               help="auto = Serper, then Brave when Serper's credits run out, then DuckDuckGo / Bing in the browser "
+                    "(free, slow, can be blocked). Providers without a key are skipped."),
+    SettingDef("serper_api_key", "Serper.dev API key", "search", "secret", help="serper.dev → sign up → API key (2,500 free searches)."),
+    SettingDef("brave_api_key", "Brave Search API key", "search", "secret", help="brave.com/search/api → sign up → API key. Check the current free allowance there."),
+    SettingDef("search_cache_days", "Reuse saved search results for (days)", "search", "int", default="30",
+               help="The same search within this many days is answered from saved results - no API call, no cost. 0 = off."),
     SettingDef("search_cost_per_call", "Est. cost per call (USD)", "search", "float", default="0.001"),
 
     SettingDef("browser_delay_min", "Min wait between page loads (s)", "browser", "float", default="4"),
@@ -62,6 +66,8 @@ DEFS: list[SettingDef] = [
     SettingDef("maps_max_results", "Google Maps: max places per search phrase", "browser", "int", default="40"),
     SettingDef("maps_daily_cap", "Google Maps: max place pages per day", "browser", "int", default="400"),
     SettingDef("browser_search_daily_cap", "Browser search: max searches per day", "browser", "int", default="200"),
+    SettingDef("browser_search_min_gap_seconds", "Browser search: min gap between searches (s)", "browser", "int",
+               default="45", help="DuckDuckGo / Bing block fast searching. A slow pace gets blocked far less often."),
     SettingDef("agent_max_steps", "AI browser agent: max actions per directory URL", "browser", "int", default="25",
                help="Each action (type, click, scroll, next page, extract) is one Gemini call."),
     SettingDef("facebook_pages", "Read public Facebook pages when a company has no website", "browser", "bool", default="true"),

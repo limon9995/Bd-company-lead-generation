@@ -158,7 +158,7 @@ def test_browser_search_block_falls_back_to_serper(db, monkeypatch, configure):
     assert browser.blocked_until(db, "duckduckgo") is not None
     camp.on_block = "pause"
     with __import__("pytest").raises(SourceBlocked):
-        providers.get_search(db, camp)("acme md")
+        providers.get_search(db, camp)("acme chairman")  # new query: "acme md" is now answered from the cache
 
 
 

@@ -44,3 +44,13 @@ class ApiUsage(Base):
     calls: Mapped[int] = mapped_column(Integer, default=0)
     est_cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
     last_error: Mapped[str] = mapped_column(Text, default="")
+
+
+class SearchCache(TimestampMixin, Base):
+    """Saved web-search results, so the same query is not paid for twice (Settings → Web search)."""
+
+    __tablename__ = "search_cache"
+    query_hash: Mapped[str] = mapped_column(String(40), primary_key=True)  # sha1 of the normalised query
+    query: Mapped[str] = mapped_column(Text, default="")
+    provider: Mapped[str] = mapped_column(String(20), default="")
+    results: Mapped[list] = mapped_column(JSON, default=list)

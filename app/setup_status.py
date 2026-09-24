@@ -30,7 +30,7 @@ def checklist(db: Session) -> list[dict]:
         key_step("gemini", ["gemini_api_key"], "Gemini API key", "Reads websites and finds the decision maker."),
         key_step("telegram", ["telegram_bot_token", "telegram_chat_id"], "Telegram bot + chat ID", "Sends you alerts."),
         key_step("smtp", ["smtp_username", "smtp_password"], "Gmail SMTP", "Sends the approved emails."),
-        key_step("search", ["serper_api_key"] if settings_store.get(db, "search_provider") == "serper" else ["brave_api_key"],
+        key_step("search", ["brave_api_key"] if settings_store.get(db, "search_provider") == "brave" else ["serper_api_key"],
                  "Search API", "Finds more decision makers when the website has none.", optional=True),
         key_step("sheets", ["sheets_service_account_json", "sheets_spreadsheet_id"], "Google Sheet",
                  "Keeps a copy of every lead in a Sheet.", optional=True),

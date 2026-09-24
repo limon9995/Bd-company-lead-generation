@@ -78,8 +78,9 @@ def test_full_run_discovers_enriches_notifies_and_drafts(db, world):
     usage = {u.provider: u.calls for u in db.scalars(select(ApiUsage))}
     # 5 healthcare phrases: "hospital" has 2 pages, the other 4 phrases one page each
     assert usage["places"] == 6
-    # 2 companies needed the search fallback (Beta: no DM on site; Clinic 2: Facebook-only) x 2 queries
-    assert usage["search"] == 4 and len(world["search"].calls) == 4
+    # 2 companies needed the search fallback (Beta: no DM on site; Clinic 2: Facebook-only) x 2 queries.
+    # Metering lives in providers.get_search (tests/test_search_chain.py); this fake search is unmetered.
+    assert len(world["search"].calls) == 4
     assert usage["gemini"] == world["llm"].calls
 
 

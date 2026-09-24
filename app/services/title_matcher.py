@@ -7,6 +7,7 @@ and pair neighbours. The layout of each run is decided by which kind comes first
 list (title, name, title, name ...) is never paired off by one.
 """
 import re
+import unicodedata
 
 from app.services.extractor import Candidate, Source, _company_mentioned
 from app.services.normalize import name_key, squash_ws
@@ -14,8 +15,58 @@ from app.services.scoring import TITLE_RANKS, matches_target
 
 MAX_PER_SOURCE = 15
 
-# Segment boundaries: new line, "|", ":", ",", brackets, dashes (a hyphen only when spaced: "Rahim - CEO").
-_SEP = re.compile(r"\n|\||:|,|;|\(|\)|–|—| - |•")
+# Segment boundaries: new line, "|", ":", ",", brackets, dashes (a hyphen only when spaced: "Rahim - CEO"),
+# and the Bangla full stop "।".
+_SEP = re.compile(r"\n|\||:|,|;|\(|\)|–|—| - |•|।")
+
+# ---- Bangla. Titles map to an English equivalent so ranking/scoring work: "অধ্যক্ষ (Principal)".
+# Longest / most specific first ("উপাধ্যক্ষ" contains "অধ্যক্ষ").
+_BN_TITLES = [(unicodedata.normalize("NFC", bn), en) for bn, en in [
+    ("ব্যবস্থাপনা পরিচালক", "Managing Director"), ("প্রধান নির্বাহী কর্মকর্তা", "CEO"), ("প্রধান নির্বাহী", "CEO"),
+    ("নির্বাহী পরিচালক", "Executive Director"), ("উপ-উপাচার্য", "Pro-Vice-Chancellor"),
+    ("উপউপাচার্য", "Pro-Vice-Chancellor"), ("উপাচার্য", "Vice Chancellor"), ("উপাধ্যক্ষ", "Vice Principal"),
+    ("অধ্যক্ষ", "Principal"), ("প্রধান শিক্ষক", "Principal (Head Teacher)"), ("ভাইস চেয়ারম্যান", "Vice Chairman"),
+    ("চেয়ারম্যান", "Chairman"), ("চেয়ারপার্সন", "Chairperson"), ("সভাপতি", "President"),
+    ("প্রতিষ্ঠাতা", "Founder"), ("স্বত্বাধিকারী", "Proprietor"), ("মালিক", "Owner"), ("মহাব্যবস্থাপক", "General Manager"),
+    ("পরিচালক", "Director"), ("রেজিস্ট্রার", "Registrar"),
+]]
+_BN_CHAR = re.compile(r"[ঀ-৿]")
+_BN_WORD = re.compile(r"^[ঀ-৿]+$")
+# former, late (x2), minister, guest, republic, government, student, parent, retired
+_BN_BAD_TITLE = re.compile(unicodedata.normalize(
+    "NFC", "সাবেক|প্রয়াত|মরহুম|মন্ত্রী|অতিথি|প্রজাতন্ত্র|সরকার|শিক্ষার্থী|ছাত্র|অভিভাবক|অবসরপ্রাপ্ত"))
+# Md., Dr., Prof., Mr., Alhaj, Engr. ("মোঃ", "ড.", "অধ্যাপক", "জনাব" ...)
+_BN_HONORIFIC = re.compile(unicodedata.normalize(
+    "NFC", r"^(মোঃ|মো\.|মোহাঃ|ড\.|ডঃ|ডা\.|ডাঃ|প্রফেসর|অধ্যাপক|প্রকৌশলী|ইঞ্জিঃ|জনাব|আলহাজ্ব|আলহাজ|হাজী|মাননীয়|মাননীয়া)$"))
+# institution / menu / function words that make a Bangla segment not a person's name
+_BN_NOT_NAME = {unicodedata.normalize("NFC", w) for w in (
+    "বিশ্ববিদ্যালয় কলেজ স্কুল বিদ্যালয় মাদ্রাসা একাডেমি লিমিটেড কোম্পানি বাংলাদেশ ঢাকা বাণী পরিচিতি আমাদের "
+    "যোগাযোগ সম্পর্কে নোটিশ ভর্তি ফলাফল শিক্ষক শিক্ষকবৃন্দ কর্মচারী সদস্য সদস্যবৃন্দ পর্ষদ কমিটি বোর্ড বিভাগ "
+    "অনুষদ প্রশাসন কর্তৃপক্ষ হোম গ্যালারি ইতিহাস লক্ষ্য উদ্দেশ্য সুবিধা জন্য এবং ও এর করে হয় থেকে তথ্য "
+    "প্রতিষ্ঠান সরকারি বেসরকারি উচ্চ মাধ্যমিক প্রাথমিক গ্রুপ শাখা আরও পড়ুন দেখুন সকল সংবাদ ঘোষণা ডাউনলোড "
+    "গভর্নিং বডি পরিচালনা মহোদয় মহোদয়া").split()}
+_BN_TITLE_NOISE = [unicodedata.normalize("NFC", w) for w in ("বাণী", "মহোদয়া", "মহোদয়", "মাননীয়া", "মাননীয়")]
+_BN_MAX_TITLE_WORDS = 6
+
+
+def _bn_title(seg: str) -> str | None:
+    """'অধ্যক্ষের বাণী' -> 'অধ্যক্ষ (Principal)'; None when the segment is not a Bangla job title."""
+    if not _BN_CHAR.search(seg) or len(seg.split()) > _BN_MAX_TITLE_WORDS or _BN_BAD_TITLE.search(seg):
+        return None
+    for bn, en in _BN_TITLES:
+        if bn in seg:
+            return f"{bn} ({en})"
+    return None
+
+
+def _is_bn_name(seg: str) -> bool:
+    tokens = seg.split()
+    core = [t for t in tokens if not _BN_HONORIFIC.match(t)]
+    if not 2 <= len(core) <= 5 or not all(_BN_WORD.match(t.rstrip(".ঃ")) for t in tokens):
+        return False
+    if any(t in _BN_NOT_NAME for t in core) or any(bn in seg for bn, _ in _BN_TITLES):
+        return False
+    return True
 
 _TITLE_WORDS = [w for rank, words in TITLE_RANKS if rank <= 2 for w in words]
 _TITLE_RE = re.compile(r"\b(" + "|".join(re.escape(w) for w in _TITLE_WORDS) + r")\b", re.I)
@@ -29,7 +80,8 @@ _TITLE_NOISE = re.compile(r"^(message|profile|speech)\s+(from|of)\s+|^(the|our)\
 # Lower-case words allowed inside a title ("Chairman of the Board of Trustees").
 _TITLE_GLUE = {"of", "the", "and", "for", "&", "in", "at", "to"}
 # Text right after the title that shows it belongs to another organisation.
-_OTHER_ORG = re.compile(r"\b(republic|government|ministry|minister)\b", re.I)
+_OTHER_ORG = re.compile(r"\b(republic|government|ministry|minister)\b|"
+                        + unicodedata.normalize("NFC", "প্রজাতন্ত্র|সরকার|মন্ত্রণালয়|মন্ত্রী"), re.I)
 # Pages that list outsiders, department chairs or club officers rather than the company's leaders.
 _SKIP_URL = re.compile(r"/(news|notice|notices|event|events|details_event|department|departments|faculty|"
                        r"faculty-member[\w-]*|club|clubs|blog)(/|$|\?)", re.I)
@@ -113,6 +165,21 @@ def _is_title(seg: str, targets: list[str]) -> bool:
         re.search(r"\b" + re.escape(t.strip()) + r"\b", seg, re.I) for t in targets if t.strip())
 
 
+def _label_bangla(start: int, end: int, seg: str) -> list[tuple]:
+    words = seg.split()
+    for bn in _BN_TITLE_NOISE:  # "অধ্যক্ষ মহোদয়ের বাণী" -> title words only
+        words = [w for w in words if not w.startswith(bn)]
+    # Inline "অধ্যক্ষঃ মোঃ রহিম উদ্দিন" - a title, a visarga used as a colon, then the name.
+    m = re.match(r"^(.+?)ঃ\s+(.+)$", seg)  # first "ঃ " only: the name may carry its own "মোঃ"
+    if m and _bn_title(m.group(1)) and _is_bn_name(m.group(2)):
+        split = start + m.start(2)
+        return [("T", start, split, _bn_title(m.group(1))), ("N", split, end, m.group(2))]
+    if _is_bn_name(seg):
+        return [("N", start, end, seg)]
+    title = _bn_title(" ".join(words)) if words else None
+    return [("T", start, end, title)] if title else [(None, start, end, seg)]
+
+
 def _display_name(seg: str) -> str:
     return seg.title() if seg.isupper() else seg
 
@@ -125,11 +192,14 @@ def find_people(company: str, targets: list[str], sources: list[Source]) -> list
             continue
         if src.kind == "website" and _SKIP_URL.search(src.url):
             continue
+        text = unicodedata.normalize("NFC", src.text)  # Bangla "য়" has two encodings
         labelled = []  # (kind, start, end, text); kind: "N" name, "T" title, None = breaks a run
-        for start, end, seg in _segments(src.text):
+        for start, end, seg in _segments(text):
             if _DEGREE.match(seg):
                 continue  # "PhD" after "Prof. X, PhD" must not split the name from its title
-            if _is_name(seg, company_key):
+            if _BN_CHAR.search(seg):
+                labelled += _label_bangla(start, end, seg)
+            elif _is_name(seg, company_key):
                 labelled.append(("N", start, end, seg))
             elif _clean_title(seg) and _is_title(_clean_title(seg), targets):
                 labelled.append(("T", start, end, _clean_title(seg)))
@@ -152,7 +222,7 @@ def find_people(company: str, targets: list[str], sources: list[Source]) -> list
                         j += 2
                         continue
                     c = Candidate(name=_display_name(name[3]), title=title[3], source_url=src.url,
-                                  evidence=squash_ws(src.text[x[1]:y[2]])[:300], evidence_exact=True)
+                                  evidence=squash_ws(text[x[1]:y[2]])[:300], evidence_exact=True)
                     c.on_website = src.kind == "website"
                     c.in_search = src.kind == "search"
                     if "linkedin.com/in/" in src.url:

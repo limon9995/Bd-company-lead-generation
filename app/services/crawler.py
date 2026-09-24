@@ -6,8 +6,9 @@ details are visited, robots.txt is respected, and requests to one host are space
 """
 import logging
 import re
+import unicodedata
 from dataclasses import dataclass, field
-from urllib.parse import urljoin, urldefrag, urlparse
+from urllib.parse import unquote, urljoin, urldefrag, urlparse
 from urllib.robotparser import RobotFileParser
 
 import httpx
@@ -26,8 +27,18 @@ LINK_KEYWORDS = [
     ("leadership", 10), ("management", 9), ("board", 9), ("director", 9), ("team", 8), ("founder", 8),
     ("chairman", 8), ("ceo", 8), ("message", 7), ("about", 6), ("who-we-are", 6), ("our-people", 7),
     ("profile", 4), ("company", 3), ("contact", 5), ("principal", 7), ("committee", 6),
-    ("পরিচালনা", 9), ("পরিচিতি", 6), ("আমাদের", 5), ("যোগাযোগ", 5), ("বাণী", 7),
+    ("trustee", 9), ("authority", 8), ("authorities", 8), ("administration", 7), ("chancellor", 8),
+    ("governing", 8), ("executive", 7), ("leaders", 9), ("key-person", 8), ("managing", 8), ("headmaster", 8),
+    ("head-teacher", 8), ("head-master", 8), ("sponsor", 5), ("officials", 6), ("people", 5),
+    # Bangla: board/governing body, trustees, authority, administration, principal, head teacher,
+    # vice-chancellor, chairman, managing director, director, founder, message, about, contact
+    ("পরিচালনা", 9), ("পর্ষদ", 9), ("গভর্নিং", 9), ("ট্রাস্টি", 9), ("কর্তৃপক্ষ", 8), ("প্রশাসন", 7),
+    ("অধ্যক্ষ", 8), ("প্রধান শিক্ষক", 8), ("উপাচার্য", 8), ("চেয়ারম্যান", 8),
+    ("ব্যবস্থাপনা", 8), ("পরিচালক", 8), ("প্রতিষ্ঠাতা", 8), ("বাণী", 7), ("পরিচিতি", 6), ("আমাদের", 5),
+    ("যোগাযোগ", 5),
 ]
+# Bangla "য়" can be one code point or two; compare everything in NFC form.
+LINK_KEYWORDS = [(unicodedata.normalize("NFC", kw), w) for kw, w in LINK_KEYWORDS]
 SKIP_EXT = re.compile(r"\.(pdf|jpe?g|png|gif|webp|svg|zip|rar|docx?|xlsx?|pptx?|mp4|mp3)(\?|$)", re.I)
 
 
@@ -151,7 +162,8 @@ def rank_candidate_links(links: list[tuple[str, str]], site_host: str) -> list[s
     for url, label in links:
         if host_of(url) != site_host or SKIP_EXT.search(url) or url.startswith("mailto:"):
             continue
-        hay = (urlparse(url).path + " " + label).lower()
+        # unquote: Bangla page names arrive percent-encoded ("/%E0%A6%85...")
+        hay = unicodedata.normalize("NFC", unquote(urlparse(url).path) + " " + label).lower()
         score = sum(w for kw, w in LINK_KEYWORDS if kw in hay)
         if score:
             scored[url] = max(score, scored.get(url, 0))

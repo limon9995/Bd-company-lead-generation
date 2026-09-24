@@ -519,20 +519,17 @@ def find_decision_maker(db: Session, job: Job) -> None:
             if search is None:
                 add_note(run, "Search API not configured - only company websites were used for decision makers.")
             else:
-                usage_key = getattr(search, "usage_key", "search")
-                for q in queries:
-                    check_budget(db, usage_key)
-                    try:
-                        results = search(q, 10)
-                    finally:
-                        record_call(db, usage_key)
+                for q in queries:  # metered and cached inside providers.get_search
+                    results = search(q, 10)
                     search_sources += [Source("search", r.url, f"{r.title} — {r.snippet}") for r in results if r.url]
         except SourceBlocked as exc:
             # Search is a bonus source here: pause it (never bypass) but keep what the website gave us.
             if not getattr(exc, "already_paused", False):
                 pause_source(db, exc)
-            add_note(run, f"{exc.source} blocked automated searching - some decision makers come from company "
-                          "websites only. A Serper or Brave API key (Settings) avoids this.")
+            what = ("no search provider was available" if exc.source == "search"
+                    else f"{exc.source} blocked automated searching")
+            add_note(run, f"Web search: {what} - some decision makers come from company websites only. "
+                          "A Serper or Brave API key (Settings → Web search) avoids this.")
         cands += extract(search_sources)
     scored = merge_and_score(cands, targets)
     people = _save_people(db, company, scored)
