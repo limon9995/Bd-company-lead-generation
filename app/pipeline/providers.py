@@ -35,7 +35,10 @@ def browser_search(db: Session, engine: str):
 
     def _search(q: str, num: int = 10):
         browser.ensure_not_paused(db, engine)
+        typing = settings_store.get(db, "browser_style") == "type"
         with browser.source_lock(engine), browser.session_for(db, engine) as session:
+            if typing:
+                return search_browser.search_by_typing(session, engine, q, num)
             return search_browser.search(session, engine, q, num)
 
     _search.usage_key = "search_browser"

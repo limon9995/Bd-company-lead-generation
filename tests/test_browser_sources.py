@@ -151,7 +151,7 @@ def test_directory_campaign_end_to_end(site, db, monkeypatch):
     monkeypatch.setattr("app.services.notifier.notify", lambda *a, **k: [])
     monkeypatch.setattr(browser, "session_for", lambda db, src: fast_session(src))
     camp = Campaign(name="Pharma members", industry_slug="healthcare", cities=["Dhaka"], discovery_source="directory",
-                    directory_urls=[base + "/members"], directory_max_pages=5)
+                    directory_urls=[base + "/members"], directory_max_pages=5, directory_agent=False)
     db.add(camp)
     db.commit()
     run = start_run(db, camp)
@@ -182,3 +182,119 @@ def urlpath(u):
     from urllib.parse import urlparse
 
     return urlparse(u).path
+
+
+# ------------------------------------------------------------------ "act like a person" + AI agent
+@needs_browser
+def test_maps_types_query_scrolls_feed_and_clicks_results(site):
+    routes, base = site
+    place_html = "<html><body><h1>{n}</h1><button data-item-id='address' aria-label='Address: Dhaka'></button></body></html>"
+    routes.update({"/maps/place/Clinic-": place_html.format(n="Clinic page"), "/maps": (FIX / "maps/home.html").read_text()})
+    with fast_session("google") as s:
+        links = maps_browser.search_by_typing(s, "clinic in Dhaka", 10, home_url=base + "/maps")
+        assert len(links) == 10  # needed scrolling: only 4 results load at first
+        assert s.page.locator("#searchboxinput").input_value() == "clinic in Dhaka"
+        p = maps_browser.click_result(s, links[5])
+    assert p.name == "Clinic page" and p.place_id == "maps:0x1:0x6"
+
+
+@needs_browser
+def test_search_engine_by_typing(site):
+    routes, base = site
+    routes["/html/?q="] = ('<div class="result"><a class="result__a" href="https://acme.com.bd/board">Board</a>'
+                           '<a class="result__snippet">Rahim Uddin, Managing Director</a></div>')
+    routes["/html/"] = '<form action="/html/" method="get"><input name="q" type="text"></form>'
+    with fast_session("duckduckgo") as s:
+        res = search_browser.search_by_typing(s, "duckduckgo", "acme md", home_url=base + "/html/")
+    assert res and res[0].url == "https://acme.com.bd/board"
+
+
+class ScriptedAgentLLM:
+    """Plays the agent: tries forbidden things first, then searches, extracts, pages, and finishes."""
+
+    def __init__(self):
+        self.steps = []
+
+    def generate_json(self, prompt, system=""):
+        import re
+
+        if prompt.startswith("Directory page:"):  # extraction call
+            return [{"name": n} for n in re.findall(r"^Company: (.+)$", prompt, re.M)]
+        els = dict((label, int(i)) for i, label in re.findall(r'^\[(\d+)\] \w+(?:\(\w*\))? "([^"]*)"', prompt, re.M))
+        url = re.search(r"CURRENT URL: (\S+)", prompt).group(1)
+        done_before = prompt.count("extract ->")
+        if "refused" not in prompt:
+            return {"action": "click", "id": els["Log in"]}  # must be refused
+        if prompt.count("refused") == 1:
+            return {"action": "click", "id": els["Sponsored"]}  # leaves site: refused
+        if prompt.count("refused") == 2:
+            return {"action": "type", "id": els["Your email"], "text": "x@y.com"}  # email field: refused
+        if "/results" not in url:
+            return {"action": "type", "id": els["Search businesses"], "text": "pharma"}
+        if done_before == 0 or ("page=2" in url and done_before == 1):
+            return {"action": "extract"}
+        if "page=2" not in url:
+            return {"action": "click", "id": els["Next"]}
+        return {"action": "done"}
+
+
+@needs_browser
+def test_ai_agent_searches_extracts_pages_and_respects_guardrails(site):
+    from app.services import web_agent
+
+    routes, base = site
+    routes["/results?kw=pharma&page=2"] = "<html><body><p>Company: Gamma Pharma</p></body></html>"
+    routes["/results?kw=pharma"] = ("<html><body><p>Company: Alpha Pharma</p><p>Company: Beta Pharma</p>"
+                                    "<a href='/results?kw=pharma&page=2'>Next</a></body></html>")
+    routes["/"] = (FIX / "agent_site.html").read_text()
+    got = []
+    with fast_session("dir:127.0.0.1") as s:
+        rep = web_agent.run(s, ScriptedAgentLLM(), base + "/", "Collect pharma businesses", max_steps=12,
+                            on_entries=lambda url, entries: got.extend(e.name for e in entries) or len(entries))
+    assert got == ["Alpha Pharma", "Beta Pharma", "Gamma Pharma"]
+    assert rep.stop_reason == "agent finished" and rep.pages_extracted == 2
+    assert any("login" in r for r in rep.log) and any("leaves the website" in r for r in rep.log)
+    assert any("account form" in r for r in rep.log)
+
+
+def test_agent_guardrails_unit():
+    from app.services.web_agent import check_action
+
+    els = {1: {"tag": "a", "type": "", "label": "Next", "href": "/p2", "in_login_form": False},
+           2: {"tag": "input", "type": "password", "label": "", "href": "", "in_login_form": True},
+           3: {"tag": "a", "type": "", "label": "Buy now", "href": "/buy", "in_login_form": False},
+           4: {"tag": "a", "type": "", "label": "Call", "href": "tel:0171", "in_login_form": False}}
+    assert check_action({"action": "click", "id": 1}, els, "dir.com.bd", "https://dir.com.bd/a") is None
+    assert "login" in check_action({"action": "type", "id": 2, "text": "x"}, els, "dir.com.bd", "https://dir.com.bd")
+    assert "risky" in check_action({"action": "click", "id": 3}, els, "dir.com.bd", "https://dir.com.bd")
+    assert "contact" in check_action({"action": "click", "id": 4}, els, "dir.com.bd", "https://dir.com.bd")
+    assert "unknown" in check_action({"action": "rm -rf"}, els, "dir.com.bd", "https://dir.com.bd")
+
+
+@needs_browser
+def test_directory_campaign_with_ai_agent_end_to_end(site, db, monkeypatch):
+    from app.models import Campaign, Company, Run
+    from app.pipeline import providers, stages
+    from app.pipeline.stages import start_run
+    from app.worker.runner import drain
+
+    routes, base = site
+    routes["/results?kw=pharma&page=2"] = "<html><body><p>Company: Gamma Pharma</p></body></html>"
+    routes["/results?kw=pharma"] = ("<html><body><p>Company: Alpha Pharma</p><p>Company: Beta Pharma</p>"
+                                    "<a href='/results?kw=pharma&page=2'>Next</a></body></html>")
+    routes["/"] = (FIX / "agent_site.html").read_text()
+    monkeypatch.setattr(providers, "get_llm", lambda db: ScriptedAgentLLM())
+    monkeypatch.setattr(stages.crawler, "crawl", lambda *a, **k: stages.crawler.CrawlResult(error="skip"))
+    monkeypatch.setattr("app.services.notifier.notify", lambda *a, **k: [])
+    monkeypatch.setattr(browser, "session_for", lambda db, src: fast_session(src))
+    camp = Campaign(name="Agent", industry_slug="healthcare", cities=["Dhaka"], discovery_source="directory",
+                    directory_urls=[base + "/"], directory_agent=True)
+    db.add(camp)
+    db.commit()
+    run = start_run(db, camp)
+    drain()
+    db.expire_all()
+    run = db.get(Run, run.id)
+    assert run.status == "done", run.notes
+    assert sorted(c.name for c in db.scalars(select(Company))) == ["Alpha Pharma", "Beta Pharma", "Gamma Pharma"]
+    assert any("AI browser agent" in n and "agent finished" in n for n in run.notes)

@@ -7,6 +7,7 @@ from urllib.parse import parse_qs, quote_plus, unquote, urlparse
 
 from selectolax.parser import HTMLParser
 
+from app.services.browser import find_search_box, type_like_person
 from app.services.search import SearchResult
 
 DDG_URL = "https://html.duckduckgo.com/html/?q={q}&kl=bd-en"
@@ -46,9 +47,25 @@ def parse_bing(html: str) -> list[SearchResult]:
 
 
 ENGINES = {"duckduckgo": (DDG_URL, parse_duckduckgo), "bing": (BING_URL, parse_bing)}
+HOMES = {"duckduckgo": "https://html.duckduckgo.com/html/", "bing": "https://www.bing.com/?setlang=en&cc=BD"}
 
 
 def search(session, engine: str, query: str, num: int = 10, base_url: str | None = None) -> list[SearchResult]:
     url_tpl, parse = ENGINES[engine]
     session.goto((base_url or url_tpl).format(q=quote_plus(query)))
+    return parse(session.html())[:num]
+
+
+def search_by_typing(session, engine: str, query: str, num: int = 10, home_url: str | None = None) -> list[SearchResult]:
+    """Open the engine's home page, type the query into its search box and press Enter."""
+    _, parse = ENGINES[engine]
+    page = session.goto(home_url or HOMES[engine])
+    box = find_search_box(page)
+    if box is None:
+        return search(session, engine, query, num)
+    session.wait_politely()
+    type_like_person(page, box, query)
+    page.wait_for_load_state("domcontentloaded")
+    page.wait_for_timeout(1500)
+    session.after_action()
     return parse(session.html())[:num]

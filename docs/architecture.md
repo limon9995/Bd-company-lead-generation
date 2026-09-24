@@ -37,6 +37,12 @@ run_campaign ─▶ discover[i] | discover_maps[i] | discover_directory[url] ─
 * **Browser search** — DuckDuckGo HTML or Bing results page instead of Serper/Brave (Settings → search provider).
 * **Facebook** — when a company has no website but a Facebook page, the public page is read without logging in;
   a login wall is counted and skipped.
+* **Smart mode** (`browser_style=type`): Maps and search engines are used through their search box (typed with
+  per-key delays, Enter), the Maps result list is wheel-scrolled and each result clicked, then "Back" to the list.
+* **AI browser agent** (`app/services/web_agent.py`, campaign "Smart mode"): each step sends Gemini the visible text
+  and a numbered list of links/buttons/inputs; Gemini answers one action (type / click / scroll / extract / back /
+  done). Code-enforced guardrails: same site only, no password/email/login forms, no login/sign-up/buy/pay controls,
+  no contact links, `agent_max_steps`, stop on 3 identical actions. Each step = one Gemini call.
 * Politeness: random 4–9 s wait before each page load, one browser job per site (`source_lock`), a normal Chrome UA.
 * Blocks: the URL and visible text are checked for CAPTCHA / "unusual traffic" / login pages → `SourceBlocked` →
   source paused for `blocked_pause_hours`, job postponed, one Telegram alert. No CAPTCHA solving or bypass.

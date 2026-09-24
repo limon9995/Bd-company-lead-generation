@@ -1,0 +1,27 @@
+<html><body>
+<input id="searchboxinput" name="q" placeholder="Search Google Maps">
+<div id="pane"></div>
+<script>
+// Mimics Maps: typing + Enter shows a results feed that loads more results as you scroll.
+const names = Array.from({length: 12}, (_, i) => "Clinic " + (i + 1));
+let shown = 0;
+function render(q) {
+  const pane = document.getElementById('pane');
+  pane.innerHTML = '<div role="feed" style="height:260px;overflow:auto" id="feed"></div>';
+  const feed = document.getElementById('feed');
+  const more = () => {
+    for (let k = 0; k < 4 && shown < names.length; k++, shown++) {
+      const d = document.createElement('div'); d.style.height = '90px';
+      d.innerHTML = `<a href="/maps/place/Clinic-${shown + 1}/data=!1s0x1:0x${shown + 1}!8m2">${names[shown]}</a>`;
+      feed.appendChild(d);
+    }
+    if (shown >= names.length && !document.getElementById('end')) {
+      const p = document.createElement('p'); p.id = 'end'; p.textContent = "You've reached the end of the list."; feed.appendChild(p);
+    }
+  };
+  more();
+  feed.addEventListener('scroll', () => { if (feed.scrollTop + feed.clientHeight >= feed.scrollHeight - 20) more(); });
+  history.replaceState(null, '', '/maps/search/' + encodeURIComponent(q));
+}
+document.getElementById('searchboxinput').addEventListener('keydown', e => { if (e.key === 'Enter') render(e.target.value); });
+</script></body></html>

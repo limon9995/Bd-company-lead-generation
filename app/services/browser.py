@@ -100,6 +100,12 @@ class BrowserSession:
         self.raise_if_blocked()
         return self.page
 
+    def after_action(self) -> None:
+        """Call after a click/Enter that loaded new content (same politeness + block check as goto)."""
+        self._last_load = time.monotonic()
+        self.pages_loaded += 1
+        self.raise_if_blocked()
+
     def raise_if_blocked(self) -> None:
         try:
             text = self.page.inner_text("body", timeout=5000)
@@ -159,3 +165,45 @@ def ensure_not_paused(db, source: str) -> None:
         err = SourceBlocked(source, f"paused until {until.isoformat(timespec='minutes')}")
         err.already_paused = True
         raise err
+
+
+# ---- "act like a person" helpers: type into boxes, press Enter, wheel-scroll, click
+SEARCH_BOX_SELECTORS = [
+    "input#searchboxinput", "textarea#sb_form_q", "input#sb_form_q", "input[name=q]", "textarea[name=q]",
+    "input[type=search]", "input[name=search]", "input[name=s]", "input[name=keyword]", "input[name=query]",
+    "input[placeholder*='earch' i]",
+]
+
+
+def find_search_box(page):
+    """First visible text search box on the page (never a password/email field)."""
+    for sel in SEARCH_BOX_SELECTORS:
+        loc = page.locator(sel)
+        for i in range(min(loc.count(), 5)):
+            el = loc.nth(i)
+            try:
+                if el.is_visible() and (el.get_attribute("type") or "text").lower() not in ("password", "email", "hidden"):
+                    return el
+            except Exception:  # noqa: BLE001 - element went away
+                continue
+    return None
+
+
+def type_like_person(page, locator, text: str, submit: bool = True) -> None:
+    locator.click()
+    locator.fill("")
+    page.keyboard.type(text, delay=random.randint(60, 150))
+    page.wait_for_timeout(random.randint(300, 800))
+    if submit:
+        page.keyboard.press("Enter")
+
+
+def wheel_scroll(page, over_selector: str | None = None, steps: int = 4) -> None:
+    """Scroll with the mouse wheel in small steps, over a panel if given (e.g. the Maps results list)."""
+    if over_selector:
+        box = page.locator(over_selector).first.bounding_box()
+        if box:
+            page.mouse.move(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+    for _ in range(steps):
+        page.mouse.wheel(0, random.randint(350, 700))
+        page.wait_for_timeout(random.randint(250, 600))

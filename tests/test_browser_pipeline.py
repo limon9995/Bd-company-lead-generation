@@ -19,8 +19,10 @@ def dummy_session(db, source):
 def setup(monkeypatch, configure, links, read):
     configure(facebook_pages="false")
     monkeypatch.setattr(browser, "session_for", dummy_session)
-    monkeypatch.setattr(maps_browser, "collect_links", lambda s, q, n: links(q))
+    for name in ("collect_links", "search_by_typing"):
+        monkeypatch.setattr(maps_browser, name, lambda s, q, n: links(q))
     monkeypatch.setattr(maps_browser, "read_place", read)
+    monkeypatch.setattr(maps_browser, "click_result", read)
     monkeypatch.setattr(stages.crawler, "crawl", fake_crawl({}))
     monkeypatch.setattr(providers, "get_llm", lambda db: RuleLLM())
     monkeypatch.setattr(providers, "get_search", lambda db: None)

@@ -56,9 +56,14 @@ DEFS: list[SettingDef] = [
 
     SettingDef("browser_delay_min", "Min wait between page loads (s)", "browser", "float", default="4"),
     SettingDef("browser_delay_max", "Max wait between page loads (s)", "browser", "float", default="9"),
+    SettingDef("browser_style", "How the browser searches", "browser", "select", default="type", options=("type", "url"),
+               help="type = opens the site, types into the search box, presses Enter, scrolls and clicks results like a "
+                    "person (slower). url = opens the search-results address directly (faster)."),
     SettingDef("maps_max_results", "Google Maps: max places per search phrase", "browser", "int", default="40"),
     SettingDef("maps_daily_cap", "Google Maps: max place pages per day", "browser", "int", default="400"),
     SettingDef("browser_search_daily_cap", "Browser search: max searches per day", "browser", "int", default="200"),
+    SettingDef("agent_max_steps", "AI browser agent: max actions per directory URL", "browser", "int", default="25",
+               help="Each action (type, click, scroll, next page, extract) is one Gemini call."),
     SettingDef("facebook_pages", "Read public Facebook pages when a company has no website", "browser", "bool", default="true"),
     SettingDef("blocked_pause_hours", "Pause a source after it blocks us (hours)", "browser", "int", default="6"),
     SettingDef("browser_proxy", "Proxy (optional)", "browser",

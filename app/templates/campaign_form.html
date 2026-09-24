@@ -19,7 +19,9 @@
     <div><label for="directory_urls">Directory URLs (one per line)</label>
     <textarea id="directory_urls" name="directory_urls" placeholder="https://example-directory.com.bd/category/hospitals">{{ c.directory_urls|join('\n') if c and c.directory_urls }}</textarea>
     <div class="help">The browser opens each URL, Gemini lists the companies on the page, then it follows the "Next" link. Only use sites whose terms allow it.</div></div>
-    <div><label for="directory_max_pages">Max pages per URL</label><input id="directory_max_pages" type="number" name="directory_max_pages" min="1" max="50" value="{{ c.directory_max_pages if c else 5 }}"></div>
+    <div><label for="directory_max_pages">Max pages per URL</label><input id="directory_max_pages" type="number" name="directory_max_pages" min="1" max="50" value="{{ c.directory_max_pages if c else 5 }}">
+    <label class="inline" style="margin-top:14px"><input type="checkbox" name="directory_agent" {{ 'checked' if not c or c.directory_agent }}> Smart mode: AI browser agent</label>
+    <div class="help">The AI uses the site like a person — types in its search box, picks filters, scrolls, clicks Next — and extracts listings on each page. Stays on that site, never logs in. Each action is one Gemini call (limit in Settings → Browser scraping). Off = read the URL and follow "Next" links only.</div></div>
   </div>
 </div>
 <div class="card" style="margin:0"><h2>Who to find</h2>

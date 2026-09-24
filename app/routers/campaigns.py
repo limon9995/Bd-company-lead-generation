@@ -86,7 +86,7 @@ def campaign_save(request: Request, cid: int | None = None, name: str = Form(...
                   max_companies_per_run: int = Form(50), schedule_cron: str = Form(""),
                   email_template_id: str = Form(""), auto_email: str | None = Form(None),
                   discovery_source: str = Form("places_api"), directory_urls: str = Form(""),
-                  directory_max_pages: int = Form(5),
+                  directory_max_pages: int = Form(5), directory_agent: str | None = Form(None),
                   is_active: str | None = Form(None), user: User = Depends(current_user), db: Session = Depends(get_db)):
     cron = schedule_cron.strip()
     if cron:
@@ -110,6 +110,7 @@ def campaign_save(request: Request, cid: int | None = None, name: str = Form(...
     c.discovery_source = discovery_source if discovery_source in ("places_api", "maps_browser", "directory") else "places_api"
     c.directory_urls = [u for u in split_lines(directory_urls) if u.startswith(("http://", "https://"))]
     c.directory_max_pages = max(1, min(int(directory_max_pages), 50))
+    c.directory_agent = bool(directory_agent)
     if c.discovery_source == "directory" and not c.directory_urls:
         flash(request, "Add at least one directory URL (starting with https://) for a directory campaign.", "err")
     c.is_active = bool(is_active) if cid else True

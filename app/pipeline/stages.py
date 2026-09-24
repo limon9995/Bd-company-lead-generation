@@ -221,7 +221,10 @@ def discover_maps(db: Session, job: Job) -> None:
     browser.ensure_not_paused(db, "google")
     done = set(job.payload.get("done", []))
     with browser.source_lock("google"), browser.session_for(db, "google") as session:
-        links = maps_browser.collect_links(session, query, settings_store.get(db, "maps_max_results"))
+        typing = settings_store.get(db, "browser_style") == "type"
+        max_results = settings_store.get(db, "maps_max_results")
+        links = (maps_browser.search_by_typing(session, query, max_results) if typing
+                 else maps_browser.collect_links(session, query, max_results))
         for link in links:
             if (run.counters or {}).get("companies", 0) >= limit:
                 break
@@ -235,7 +238,7 @@ def discover_maps(db: Session, job: Job) -> None:
                                  known.reviews_count, known.google_maps_url, known.category, "OPERATIONAL")
             else:
                 check_budget(db, "maps_browser")
-                p = maps_browser.read_place(session, link)
+                p = maps_browser.click_result(session, link) if typing else maps_browser.read_place(session, link)
                 record_call(db, "maps_browser")
             register_place(db, run, campaign, p, city, "maps_browser", link)
             done.add(key)
@@ -264,6 +267,8 @@ def discover_directory(db: Session, job: Job) -> None:
     browser.ensure_not_paused(db, source_name)
     limit = campaign.max_companies_per_run
     default_city = (campaign.cities or [""])[0]
+    if campaign.directory_agent and not job.payload.get("next_url"):
+        return _directory_agent(db, run, campaign, url, llm, source_name, default_city)
     with browser.source_lock(source_name), browser.session_for(db, source_name) as session:
         while url and pages_done < campaign.directory_max_pages and (run.counters or {}).get("companies", 0) < limit:
             session.goto(url, wait_until="load")
@@ -283,6 +288,42 @@ def discover_directory(db: Session, job: Job) -> None:
             url = nxt if nxt and nxt != url else None
             job.payload = {**job.payload, "next_url": url, "pages_done": pages_done}
             db.commit()
+
+
+def _directory_agent(db: Session, run: Run, campaign: Campaign, url: str, llm, source_name: str, default_city: str) -> None:
+    """Let the AI browser agent use the site like a person: search box, filters, scrolling, next pages."""
+    from app.services import browser, web_agent
+
+    preset = db.scalar(select(IndustryPreset).where(IndustryPreset.slug == campaign.industry_slug))
+    industry = preset.name if preset else campaign.industry_slug.replace("_", " ")
+    keyword = (preset.places_queries[0] if preset and preset.places_queries else industry)
+    cities = ", ".join(campaign.cities or [])
+    limit = campaign.max_companies_per_run
+    goal = (f"Collect {industry} businesses{' in ' + cities if cities else ''} (Bangladesh) listed on this website. "
+            f"If there is a search box or category/city filter, use it (for example search '{keyword}'). "
+            f"Use 'extract' on every page that lists businesses, then go to the next page or scroll for more. "
+            f"Stop when there are no more pages or about {limit} businesses are collected.")
+
+    def on_entries(page_url, entries):
+        added = 0
+        for e in entries:
+            if (run.counters or {}).get("companies", 0) >= limit:
+                break
+            p = places.Place("", e.name, e.address, e.phone, e.website, None, None, "", e.category, "OPERATIONAL")
+            if register_place(db, run, campaign, p, e.city or default_city, "directory", e.detail_url or page_url,
+                              extra_emails=[e.email.lower()] if "@" in e.email else None):
+                added += 1
+        bump(run, "directory_pages")
+        db.commit()
+        return added
+
+    with browser.source_lock(source_name), browser.session_for(db, source_name) as session:
+        report = web_agent.run(session, llm, url, goal, max_steps=settings_store.get(db, "agent_max_steps"),
+                               on_entries=on_entries, before_llm=lambda: check_budget(db, "gemini"),
+                               after_llm=lambda: record_call(db, "gemini"))
+    bump(run, "agent_steps", report.steps)
+    add_note(run, f"AI browser agent on {url}: {report.steps} actions, {report.pages_extracted} pages read, "
+                  f"{report.extracted} new companies ({report.stop_reason}).")
 
 
 def best_person_id(company: Company) -> int | None:

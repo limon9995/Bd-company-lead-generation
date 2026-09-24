@@ -54,6 +54,10 @@ compliance.
 | LinkedIn | — | — | Not scraped; only public search snippets + a link | — |
 | WhatsApp | Official Cloud API only | Meta per-message | Allowed | High |
 
+Browser mode works like a person at a computer: it types into the site's search box, scrolls the results and clicks
+through them. For directory sites an AI agent (Gemini) decides each step — search, filter, scroll, next page, collect —
+and is limited by code to the chosen site, with no logins, sign-ups or purchases.
+
 Safeguards in browser mode: slow, human-paced page loads (4–9 s), one job per site at a time, and an automatic pause
 when a site shows a CAPTCHA, "unusual traffic" or login page. The system never solves CAPTCHAs, never logs in and
 does not disguise itself. **Recommendation:** start the pilot in browser mode to keep cost at zero, and use the API

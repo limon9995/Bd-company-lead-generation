@@ -41,7 +41,7 @@ python -m app.bootstrap                # migrations + seed industries/template
 python -m scripts.create_admin you@example.com
 uvicorn app.main:app --reload          # admin panel
 python -m app.worker                   # pipeline worker + scheduler (second terminal)
-pytest                                 # 58 tests, no network needed (external APIs are mocked)
+pytest                                 # 63 tests, no network needed (external APIs are mocked)
 ```
 
 Tests also run on Postgres: `DATABASE_URL=postgresql+psycopg://user:pw@localhost/test pytest`.
@@ -52,6 +52,12 @@ Tests also run on Postgres: `DATABASE_URL=postgresql+psycopg://user:pw@localhost
 | Find companies | Google Places API | Google Maps pages, or any directory URL you give |
 | Decision-maker search | Serper / Brave | DuckDuckGo / Bing result pages |
 | Company details | company website crawl (always) | + public Facebook page when there is no website |
+
+**Smart mode** (default, Settings → Browser scraping → "How the browser searches" = `type`): the browser opens the
+site, types into its search box, presses Enter, wheel-scrolls the results and clicks each one. For directory sites an
+**AI browser agent** (Gemini) reads each page and decides the next step — type a search, pick a filter, scroll, click
+Next, extract listings — within guardrails: same website only, never logs in or fills email/password forms, never
+clicks buy/pay/sign-up, step limit.
 
 Browser mode waits 4–9 s between page loads, runs one job per site at a time, and **stops** on a CAPTCHA,
 "unusual traffic" or login page — the source is paused (default 6 h, "Resume now" in Settings). It never solves
