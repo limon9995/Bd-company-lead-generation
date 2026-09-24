@@ -35,6 +35,12 @@ Restore: `gunzip -c backups/leadgen-DATE.sql.gz | docker compose exec -T db psql
 | Google Sheets | Cloud console → IAM → Service Accounts → create → Keys → JSON; enable **Google Sheets API** | Paste the JSON in Settings, create a sheet, **share it with the service account's `client_email` as Editor**, paste the sheet ID. |
 | WhatsApp (optional) | Meta for Developers → WhatsApp → Cloud API | Needs business verification + an approved template with one body variable `{{1}}`. |
 
+### Free browser mode (no Places / Serper keys)
+* Campaign → **Where companies come from** → *Google Maps (browser)* or *Directory URLs (browser)*.
+* Settings → Web search → provider `duckduckgo` or `bing`.
+* Only Gemini is then required. Browser mode is slower (4–9 s per page) and can be paused by a block —
+  see Settings → Browser scraping. Keep the delays; lowering them makes blocks more likely.
+
 ## 3. First campaign
 1. **Industries** — check/edit the presets (search phrases + titles). This is the industry "switch".
 2. **Email templates** — edit the default template: your service line, tone. Variables are listed on the page.

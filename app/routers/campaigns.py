@@ -13,6 +13,10 @@ from app.pipeline.stages import start_run
 router = APIRouter()
 
 
+def split_lines(s: str) -> list[str]:
+    return [x.strip() for x in (s or "").splitlines() if x.strip()]
+
+
 def split_list(s: str) -> list[str]:
     return [x.strip() for x in (s or "").replace("\n", ",").split(",") if x.strip()]
 
@@ -81,6 +85,8 @@ def campaign_save(request: Request, cid: int | None = None, name: str = Form(...
                   cities: str = Form("Dhaka"), extra_keywords: str = Form(""), target_titles: str = Form(""),
                   max_companies_per_run: int = Form(50), schedule_cron: str = Form(""),
                   email_template_id: str = Form(""), auto_email: str | None = Form(None),
+                  discovery_source: str = Form("places_api"), directory_urls: str = Form(""),
+                  directory_max_pages: int = Form(5),
                   is_active: str | None = Form(None), user: User = Depends(current_user), db: Session = Depends(get_db)):
     cron = schedule_cron.strip()
     if cron:
@@ -101,6 +107,11 @@ def campaign_save(request: Request, cid: int | None = None, name: str = Form(...
     c.schedule_cron = cron
     c.email_template_id = int(email_template_id) if email_template_id else None
     c.auto_email = bool(auto_email)
+    c.discovery_source = discovery_source if discovery_source in ("places_api", "maps_browser", "directory") else "places_api"
+    c.directory_urls = [u for u in split_lines(directory_urls) if u.startswith(("http://", "https://"))]
+    c.directory_max_pages = max(1, min(int(directory_max_pages), 50))
+    if c.discovery_source == "directory" and not c.directory_urls:
+        flash(request, "Add at least one directory URL (starting with https://) for a directory campaign.", "err")
     c.is_active = bool(is_active) if cid else True
     db.flush()
     audit(db, user, "campaign.save", f"{c.id}:{c.name}")

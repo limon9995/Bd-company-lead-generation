@@ -11,7 +11,7 @@ from app.pipeline import providers
 from app.pipeline.queue import enqueue, now
 from app.services import crawler, places
 from app.services.email_finder import choose_email
-from app.services.errors import ProviderError, SkipStage
+from app.services.errors import ProviderError, SkipStage, SourceBlocked
 from app.services.extractor import Source, extract_candidates, merge_and_score, search_queries
 from app.services.normalize import name_key, normalize_bd_phone, normalize_domain, person_key, social_kind
 from app.services.scoring import bucket
@@ -75,22 +75,40 @@ def start_run(db: Session, campaign: Campaign, trigger: str = "manual") -> Run:
 def run_campaign(db: Session, job: Job) -> None:
     run = db.get(Run, job.payload["run_id"])
     campaign = db.get(Campaign, run.campaign_id)
-    if not providers.places_key(db):
-        run.status = "failed"
-        run.finished_at = now()
-        add_note(run, "Google Places API key is not set (Settings → Google Places API).")
-        raise SkipStage("Places API key not set")
+    source = campaign.discovery_source or "places_api"
+    if source == "directory":
+        urls = [u for u in (campaign.directory_urls or []) if u.startswith(("http://", "https://"))]
+        if not urls:
+            _fail_start(run, "No directory URLs set on this campaign (Campaigns → Edit → Directory URLs).")
+        if providers.get_llm(db) is None:
+            _fail_start(run, "Directory scraping needs the Gemini API key (Settings → Gemini) to read the pages.")
+        run.plan = urls
+        for i in range(len(urls)):
+            enqueue(db, "discover_directory", {"run_id": run.id, "idx": i}, run_id=run.id, dedupe_key=f"dir:{run.id}:{i}")
+        return
+    if source == "places_api" and not providers.places_key(db):
+        _fail_start(run, "Google Places API key is not set (Settings → Google Places API), "
+                         "or switch the campaign to 'Google Maps (browser)'.")
     preset = db.scalar(select(IndustryPreset).where(IndustryPreset.slug == campaign.industry_slug))
     queries = list(preset.places_queries if preset else []) + list(campaign.extra_keywords or [])
     if not queries:
         queries = [campaign.industry_slug.replace("_", " ")]
     cities = campaign.cities or ["Dhaka"]
     run.plan = [f"{q} in {city}, Bangladesh" for city in cities for q in queries]
-    enqueue(db, "discover", {"run_id": run.id, "idx": 0}, run_id=run.id, dedupe_key=f"discover:{run.id}:0")
+    job_type = "discover_maps" if source == "maps_browser" else "discover"
+    enqueue(db, job_type, {"run_id": run.id, "idx": 0}, run_id=run.id, dedupe_key=f"{job_type}:{run.id}:0")
+
+
+def _fail_start(run: Run, note: str) -> None:
+    run.status = "failed"
+    run.finished_at = now()
+    add_note(run, note)
+    raise SkipStage(note)
 
 
 # ---------------------------------------------------------------- discover
-def upsert_company(db: Session, p: places.Place, industry: str, city: str, campaign_id: int) -> tuple[Company, bool]:
+def upsert_company(db: Session, p: places.Place, industry: str, city: str, campaign_id: int,
+                   source: str = "places_api", source_url: str = "") -> tuple[Company, bool]:
     domain = normalize_domain(p.website)
     company = db.scalar(select(Company).where(Company.place_id == p.place_id)) if p.place_id else None
     if company is None and domain:
@@ -98,11 +116,13 @@ def upsert_company(db: Session, p: places.Place, industry: str, city: str, campa
     phone = normalize_bd_phone(p.phone) or p.phone
     if company is None and phone:
         company = db.scalar(select(Company).where(Company.name_key == name_key(p.name), Company.phone == phone))
+    if company is None and not phone and not domain and city:
+        company = db.scalar(select(Company).where(Company.name_key == name_key(p.name), Company.city == city))
     created = company is None
     if created:
         company = Company(place_id=p.place_id or None, domain=domain, name=p.name, name_key=name_key(p.name),
                           industry_slug=industry, first_seen_campaign_id=campaign_id, socials={}, generic_emails=[],
-                          extra_phones=[], crawled_pages=[])
+                          extra_phones=[], crawled_pages=[], source=source, source_url=source_url or p.maps_url or "")
         db.add(company)
     company.category = p.category or company.category
     company.address = p.address or company.address
@@ -119,6 +139,30 @@ def upsert_company(db: Session, p: places.Place, industry: str, city: str, campa
             company.website = p.website
     db.flush()
     return company, created
+
+
+def register_place(db: Session, run: Run, campaign: Campaign, p: places.Place, city: str, source: str,
+                   source_url: str = "", extra_emails: list[str] | None = None) -> bool:
+    """Upsert the company, make it a lead of this campaign and queue enrichment. True if a new lead was added."""
+    if p.business_status == "CLOSED_PERMANENTLY" or not p.name:
+        return False
+    company, created = upsert_company(db, p, campaign.industry_slug, city, campaign.id, source, source_url)
+    if extra_emails:
+        company.generic_emails = list(dict.fromkeys((company.generic_emails or []) + extra_emails))[:20]
+    lead = db.scalar(select(Lead).where(Lead.campaign_id == campaign.id, Lead.company_id == company.id))
+    if lead is not None:
+        return False  # already a lead of this campaign (earlier run or earlier query)
+    lead = Lead(campaign_id=campaign.id, company_id=company.id, run_id=run.id, crm_status="new")
+    db.add(lead)
+    db.flush()
+    bump(run, "companies")
+    bump(run, "new_companies" if created else "existing_companies")
+    if needs_enrichment(db, company):
+        enqueue(db, "crawl_company", {"run_id": run.id, "company_id": company.id, "lead_id": lead.id},
+                run_id=run.id, dedupe_key=f"crawl:{run.id}:{company.id}")
+    else:
+        lead.primary_person_id = best_person_id(company)
+    return True
 
 
 def needs_enrichment(db: Session, company: Company) -> bool:
@@ -151,22 +195,7 @@ def discover(db: Session, job: Job) -> None:
         for p in results:
             if (run.counters or {}).get("companies", 0) >= limit:
                 break
-            if p.business_status == "CLOSED_PERMANENTLY" or not p.name:
-                continue
-            company, created = upsert_company(db, p, campaign.industry_slug, city, campaign.id)
-            lead = db.scalar(select(Lead).where(Lead.campaign_id == campaign.id, Lead.company_id == company.id))
-            if lead is not None:
-                continue  # already a lead of this campaign (earlier run or earlier query)
-            lead = Lead(campaign_id=campaign.id, company_id=company.id, run_id=run.id, crm_status="new")
-            db.add(lead)
-            db.flush()
-            bump(run, "companies")
-            bump(run, "new_companies" if created else "existing_companies")
-            if needs_enrichment(db, company):
-                enqueue(db, "crawl_company", {"run_id": run.id, "company_id": company.id, "lead_id": lead.id},
-                        run_id=run.id, dedupe_key=f"crawl:{run.id}:{company.id}")
-            else:
-                lead.primary_person_id = best_person_id(company)
+            register_place(db, run, campaign, p, city, "places_api")
         pages_done += 1
         # persist progress so a retry doesn't pay for the same page twice
         job.payload = {**job.payload, "page_token": token, "pages_done": pages_done}
@@ -175,6 +204,85 @@ def discover(db: Session, job: Job) -> None:
             break
     if (run.counters or {}).get("companies", 0) < limit and idx + 1 < len(run.plan):
         enqueue(db, "discover", {"run_id": run.id, "idx": idx + 1}, run_id=run.id, dedupe_key=f"discover:{run.id}:{idx + 1}")
+
+
+def discover_maps(db: Session, job: Job) -> None:
+    """Google Maps in a headless browser (no Places API key). One browser job at a time."""
+    from app.services import browser, maps_browser
+
+    run = db.get(Run, job.payload["run_id"])
+    campaign = db.get(Campaign, run.campaign_id)
+    idx = job.payload["idx"]
+    if idx >= len(run.plan or []):
+        return
+    query = run.plan[idx]
+    city = query.split(" in ")[-1].split(",")[0].strip()
+    limit = campaign.max_companies_per_run
+    browser.ensure_not_paused(db, "google")
+    done = set(job.payload.get("done", []))
+    with browser.source_lock("google"), browser.session_for(db, "google") as session:
+        links = maps_browser.collect_links(session, query, settings_store.get(db, "maps_max_results"))
+        for link in links:
+            if (run.counters or {}).get("companies", 0) >= limit:
+                break
+            key = maps_browser.place_key_from_url(link)
+            if key in done:
+                continue
+            known = db.scalar(select(Company).where(Company.place_id == key)) if key else None
+            if known is not None and not needs_enrichment(db, known):
+                # already have this place: no need to open its page again
+                p = places.Place(key, known.name, known.address, known.phone, known.website, known.rating,
+                                 known.reviews_count, known.google_maps_url, known.category, "OPERATIONAL")
+            else:
+                check_budget(db, "maps_browser")
+                p = maps_browser.read_place(session, link)
+                record_call(db, "maps_browser")
+            register_place(db, run, campaign, p, city, "maps_browser", link)
+            done.add(key)
+            job.payload = {**job.payload, "done": sorted(done)}
+            db.commit()
+    if (run.counters or {}).get("companies", 0) < limit and idx + 1 < len(run.plan):
+        enqueue(db, "discover_maps", {"run_id": run.id, "idx": idx + 1}, run_id=run.id,
+                dedupe_key=f"discover_maps:{run.id}:{idx + 1}")
+
+
+def discover_directory(db: Session, job: Job) -> None:
+    """Any public directory/listing URL: browser renders it, Gemini lists the companies, follow 'next'."""
+    from urllib.parse import urlparse
+
+    from app.services import browser, directory
+
+    run = db.get(Run, job.payload["run_id"])
+    campaign = db.get(Campaign, run.campaign_id)
+    url = job.payload.get("next_url") or run.plan[job.payload["idx"]]
+    pages_done = job.payload.get("pages_done", 0)
+    llm = providers.get_llm(db)
+    if llm is None:
+        raise SkipStage("Gemini API key not set")
+    host = urlparse(url).hostname or "directory"
+    source_name = f"dir:{host}"
+    browser.ensure_not_paused(db, source_name)
+    limit = campaign.max_companies_per_run
+    default_city = (campaign.cities or [""])[0]
+    with browser.source_lock(source_name), browser.session_for(db, source_name) as session:
+        while url and pages_done < campaign.directory_max_pages and (run.counters or {}).get("companies", 0) < limit:
+            session.goto(url, wait_until="load")
+            html = session.html()
+            check_budget(db, "gemini")
+            entries = directory.extract_entries(llm, url, html)
+            record_call(db, "gemini")
+            for e in entries:
+                if (run.counters or {}).get("companies", 0) >= limit:
+                    break
+                p = places.Place("", e.name, e.address, e.phone, e.website, None, None, "", e.category, "OPERATIONAL")
+                register_place(db, run, campaign, p, e.city or default_city, "directory", e.detail_url or url,
+                               extra_emails=[e.email.lower()] if "@" in e.email else None)
+            bump(run, "directory_pages")
+            pages_done += 1
+            nxt = directory.find_next_url(html, url)
+            url = nxt if nxt and nxt != url else None
+            job.payload = {**job.payload, "next_url": url, "pages_done": pages_done}
+            db.commit()
 
 
 def best_person_id(company: Company) -> int | None:
@@ -207,9 +315,36 @@ def crawl_company(db: Session, job: Job) -> None:
         bump(run, "crawled" if res.pages else "crawl_failed")
     else:
         bump(run, "no_website")
+        fb = (company.socials or {}).get("facebook")
+        if fb and settings_store.get(db, "facebook_pages"):
+            try:
+                read_facebook(db, run, company, fb)
+            except SourceBlocked:
+                raise
+            except Exception as exc:  # noqa: BLE001 - Facebook is a bonus source; never fail the company for it
+                log.info("facebook read failed for %s: %s", fb, exc)
+                bump(run, "facebook_failed")
     company.enrichment_status = "crawled"
     enqueue(db, "find_decision_maker", dict(job.payload), run_id=run.id,
             dedupe_key=f"dm:{run.id}:{company.id}")
+
+
+def read_facebook(db: Session, run: Run, company: Company, fb_url: str) -> None:
+    from app.services import browser, facebook_page
+
+    if browser.blocked_until(db, "facebook"):
+        return
+    with browser.source_lock("facebook"), browser.session_for(db, "facebook") as session:
+        res = facebook_page.read_page(session, fb_url)
+    if res.login_wall or not res.text:
+        bump(run, "facebook_login_wall")
+        add_note(run, "Facebook showed a login wall for some pages - their details could not be read without logging in "
+                      "(we never log in).")
+        return
+    bump(run, "facebook_read")
+    company.crawled_pages = [*(company.crawled_pages or []), {"url": res.url, "title": "Facebook page", "text": res.text}]
+    company.generic_emails = list(dict.fromkeys((company.generic_emails or []) + res.emails))[:20]
+    company.extra_phones = list(dict.fromkeys((company.extra_phones or []) + res.phones))[:10]
 
 
 # ---------------------------------------------------------------- decision maker
@@ -260,12 +395,13 @@ def find_decision_maker(db: Session, job: Job) -> None:
                 add_note(run, "Search API not configured - only company websites were used for decision makers.")
             else:
                 search_sources = []
+                usage_key = getattr(search, "usage_key", "search")
                 for q in search_queries(company.name, company.city or "", targets):
-                    check_budget(db, "search")
+                    check_budget(db, usage_key)
                     try:
                         results = search(q, 10)
                     finally:
-                        record_call(db, "search")
+                        record_call(db, usage_key)
                     search_sources += [Source("search", r.url, f"{r.title} — {r.snippet}") for r in results if r.url]
                 if search_sources:
                     check_budget(db, "gemini")
@@ -381,6 +517,8 @@ def finalize_run(db: Session, job: Job) -> None:
 HANDLERS = {
     "run_campaign": run_campaign,
     "discover": discover,
+    "discover_maps": discover_maps,
+    "discover_directory": discover_directory,
     "crawl_company": crawl_company,
     "find_decision_maker": find_decision_maker,
     "finalize_run": finalize_run,

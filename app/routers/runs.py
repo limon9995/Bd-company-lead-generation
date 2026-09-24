@@ -84,7 +84,9 @@ def dashboard(request: Request, user: User = Depends(current_user), db: Session 
         d = db.scalar(select(func.count(Lead.id)).where(Lead.campaign_id == c.id, Lead.primary_person_id.is_not(None))) or 0
         per_campaign.append({"c": c, "n": n, "dm": d, "rate": round(100 * d / n) if n else 0})
     usage = db.scalars(select(ApiUsage).order_by(ApiUsage.day.desc(), ApiUsage.provider).limit(21)).all()
-    warnings = [msg for key, msg in REQUIRED if not settings_store.is_set(db, key)]
+    uses_api = db.scalar(select(func.count(Campaign.id)).where(Campaign.discovery_source == "places_api")) or 0
+    warnings = [msg for key, msg in REQUIRED if not settings_store.is_set(db, key)
+                and not (key == "places_api_key" and not uses_api)]
     if settings_store.is_set(db, "telegram_bot_token") and not settings_store.get(db, "telegram_chat_id"):
         warnings.append("Telegram chat ID not set - Settings → Telegram → Detect chat ID")
     steps = checklist(db)

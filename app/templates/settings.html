@@ -13,6 +13,11 @@
     {% if g.id == 'telegram' %}<button class="btn sm" type="button" data-post-json="/settings/telegram/detect" data-out="out-{{ g.id }}" data-reload="1">Detect chat ID</button>{% endif %}
   </div>
   <div class="small muted">{{ g.desc }}</div>
+  {% if g.id == 'browser' %}
+    {% for pz in paused %}<div class="callout warn" style="margin-top:10px">{{ icon('alert') }}<div class="grow"><b>{{ pz.source }}</b> is paused until {{ pz.until|local }} because it blocked automated access.</div>
+      <form method="post" action="/settings/browser/resume"><input type="hidden" name="csrf_token" value="{{ csrf }}"><input type="hidden" name="source" value="{{ pz.source }}"><button class="btn sm">Resume now</button></form></div>
+    {% else %}<div class="callout info small" style="margin-top:10px">{{ icon('info') }}<div>No source is paused. Browser mode is used by campaigns set to "Google Maps (browser)" or "Directory URLs", by search provider duckduckgo/bing, and for public Facebook pages.</div></div>{% endfor %}
+  {% endif %}
   <div class="test-result" id="out-{{ g.id }}" role="status"></div>
   <form method="post" action="/settings/{{ g.id }}"><input type="hidden" name="csrf_token" value="{{ csrf }}">
   <div class="grid g3">

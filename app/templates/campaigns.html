@@ -6,7 +6,7 @@
 <div class="card flush"><div class="table-wrap"><table><thead><tr><th>Campaign</th><th>Industry</th><th>Cities</th><th>Schedule</th><th>Leads</th><th>Last run</th><th>Email</th><th></th></tr></thead><tbody>
 {% for r in rows %}{% set c = r.c %}<tr>
 <td><b>{{ c.name }}</b>{% if not c.is_active %} <span class="pill">paused</span>{% endif %}<div class="small muted">max {{ c.max_companies_per_run }} companies / run</div></td>
-<td>{{ c.industry_slug.replace('_', ' ') }}</td><td>{{ c.cities|join(', ') }}</td>
+<td>{{ c.industry_slug.replace('_', ' ') }}<div class="small muted">{{ {'places_api': 'Places API', 'maps_browser': 'Maps · browser', 'directory': 'Directory · browser'}.get(c.discovery_source, c.discovery_source) }}</div></td><td>{{ c.cities|join(', ') }}</td>
 <td class="mono">{{ c.schedule_cron or 'manual' }}</td><td class="num"><a href="/leads?campaign={{ c.id }}">{{ r.leads }}</a></td>
 <td>{% if r.last %}<a href="/runs/{{ r.last.id }}">#{{ r.last.id }}</a> <span class="pill {{ r.last.status }}">{{ r.last.status }}</span>{% else %}<span class="muted">never</span>{% endif %}</td>
 <td>{{ 'auto-approve' if c.auto_email else ('drafts' if c.email_template_id else 'off') }}</td>

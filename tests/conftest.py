@@ -8,6 +8,9 @@ os.environ.setdefault("DATABASE_URL", f"sqlite:///{_tmp}/test.db")
 os.environ["APP_SECRET_KEY"] = Fernet.generate_key().decode()
 os.environ["SESSION_SECRET"] = "test-session-secret"
 os.environ["BASE_URL"] = "http://testserver"
+_chromium = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome"
+if os.path.exists(_chromium):
+    os.environ.setdefault("CHROMIUM_EXECUTABLE", _chromium)
 
 import pytest  # noqa: E402
 

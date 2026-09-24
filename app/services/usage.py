@@ -12,7 +12,8 @@ from app.config import config
 from app.models import ApiUsage
 from app.services.errors import BudgetExceeded
 
-CAP_KEYS = {"places": "places_daily_cap", "search": "search_daily_cap", "gemini": "gemini_daily_cap"}
+CAP_KEYS = {"places": "places_daily_cap", "search": "search_daily_cap", "gemini": "gemini_daily_cap",
+            "maps_browser": "maps_daily_cap", "search_browser": "browser_search_daily_cap"}
 COST_KEYS = {"places": "places_cost_per_call", "search": "search_cost_per_call", "gemini": "gemini_cost_per_call"}
 
 

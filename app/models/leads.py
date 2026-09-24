@@ -22,6 +22,10 @@ class Campaign(TimestampMixin, Base):
     email_template_id: Mapped[int | None] = mapped_column(ForeignKey("email_templates.id", ondelete="SET NULL"), nullable=True)
     auto_email: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # where companies come from: places_api | maps_browser | directory
+    discovery_source: Mapped[str] = mapped_column(String(20), default="places_api")
+    directory_urls: Mapped[list] = mapped_column(JSON, default=list)
+    directory_max_pages: Mapped[int] = mapped_column(Integer, default=5)
 
 
 class Company(TimestampMixin, Base):
@@ -48,6 +52,8 @@ class Company(TimestampMixin, Base):
     enrichment_status: Mapped[str] = mapped_column(String(30), default="new")  # new/crawled/dm_done/failed
     enriched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     first_seen_campaign_id: Mapped[int | None] = mapped_column(ForeignKey("campaigns.id", ondelete="SET NULL"), nullable=True)
+    source: Mapped[str] = mapped_column(String(20), default="places_api")  # places_api | maps_browser | directory
+    source_url: Mapped[str] = mapped_column(String(1000), default="")
 
     people: Mapped[list["Person"]] = relationship(back_populates="company", cascade="all, delete-orphan")
 

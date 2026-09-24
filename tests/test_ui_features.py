@@ -99,3 +99,21 @@ def test_template_preview_uses_latest_lead_and_flags_unknown_vars(client, db):  
     res = client.post("/templates/preview", headers={"X-CSRF-Token": tok},
                       data={"subject_tpl": "Hi {{company_name}}", "body_tpl": "Dear {{first_name}}", "use_ai_personalisation": "on"}).json()
     assert res["subject"] == "Hi Acme" and res["body"].startswith("Dear Rahim")
+
+
+def test_campaign_source_fields_and_resume_paused_source(client, db):  # noqa: F811
+    from app.services import browser
+
+    tok = login(client)
+    client.post("/campaigns", data={"name": "Dir", "industry_slug": "healthcare", "cities": "Dhaka", "csrf_token": tok,
+                                    "discovery_source": "directory", "directory_urls": "https://dir.example/a\nnot-a-url\n",
+                                    "directory_max_pages": "3"})
+    c = db.scalar(select(Campaign))
+    assert c.discovery_source == "directory" and c.directory_urls == ["https://dir.example/a"] and c.directory_max_pages == 3
+    assert "Directory · browser" in client.get("/campaigns").text
+    browser.set_blocked(db, "google", 6)
+    db.commit()
+    assert "is paused until" in client.get("/settings").text
+    client.post("/settings/browser/resume", data={"source": "google", "csrf_token": tok})
+    db.expire_all()
+    assert browser.blocked_until(db, "google") is None

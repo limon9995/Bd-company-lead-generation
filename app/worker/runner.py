@@ -11,7 +11,7 @@ from app.db import SessionLocal
 from app.models import ApiUsage, Job, Run
 from app.pipeline import queue
 from app.pipeline.stages import HANDLERS, add_note
-from app.services.errors import BudgetExceeded, SkipStage
+from app.services.errors import BudgetExceeded, SkipStage, SourceBlocked
 from app.services.usage import today_local
 
 log = logging.getLogger(__name__)
@@ -36,6 +36,24 @@ def _alert_budget_once(db, provider: str) -> None:
                    "Raise the cap in Settings → Crawling & budgets if needed.")
 
 
+def _handle_blocked(db, job: Job, exc: SourceBlocked) -> None:
+    """A site showed a CAPTCHA / block / login wall: pause that source and retry the job later. Never bypass."""
+    from app import settings_store
+    from app.services import browser
+    from app.services.notifier import notify
+
+    until = browser.blocked_until(db, exc.source)
+    newly = until is None
+    if newly:
+        until = browser.set_blocked(db, exc.source, settings_store.get(db, "blocked_pause_hours"))
+        db.commit()
+    queue.postpone(db, job, until, str(exc))
+    if newly:
+        notify(db, f"⏸ <b>{exc.source}</b> blocked automated access ({exc}). Paused until "
+                   f"{until.astimezone(ZoneInfo(config.timezone)):%d %b %H:%M}. Jobs resume automatically; "
+                   "switch that campaign to the API source if it keeps happening.")
+
+
 def process(db, job: Job) -> None:
     handler = HANDLERS.get(job.type)
     run = db.get(Run, job.run_id) if job.run_id else None
@@ -57,6 +75,9 @@ def process(db, job: Job) -> None:
             if job.type != "run_campaign" and str(exc) != "run cancelled":  # avoid duplicate/noisy notes
                 add_note(run, str(exc))
         queue.finish(db, db.get(Job, job.id), "skipped", str(exc))
+    except SourceBlocked as exc:
+        db.rollback()
+        _handle_blocked(db, db.get(Job, job.id), exc)
     except BudgetExceeded as exc:
         db.rollback()
         queue.postpone(db, db.get(Job, job.id), next_local_midnight(), str(exc))

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -28,9 +28,39 @@ def _view(db: Session) -> list[dict]:
     return groups
 
 
+def paused_sources(db: Session) -> list[dict]:
+    from app.models import Setting
+    from app.services import browser
+
+    out = []
+    for row in db.query(Setting).filter(Setting.key.like("\\_blocked:%", escape="\\")):
+        source = row.key.split(":", 1)[1]
+        until = browser.blocked_until(db, source)
+        if until:
+            out.append({"source": source, "until": until})
+    return out
+
+
 @router.get("/settings")
 def settings_page(request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)):
-    return render(request, "settings.html", {"groups": _view(db)})
+    return render(request, "settings.html", {"groups": _view(db), "paused": paused_sources(db)})
+
+
+@router.post("/settings/browser/resume", dependencies=[Depends(verify_csrf)])
+def resume_source(request: Request, source: str = Form(...), user: User = Depends(current_user), db: Session = Depends(get_db)):
+    from sqlalchemy import update
+
+    from app.models import Job
+    from app.pipeline.queue import now
+    from app.services import browser
+
+    browser.clear_blocked(db, source)
+    # jobs postponed by this block run again right away
+    db.execute(update(Job).where(Job.status == "queued", Job.last_error.like(f"{source} blocked%")).values(run_after=now()))
+    audit(db, user, "browser.resume", source)
+    db.commit()
+    flash(request, f"Resumed {source}. If it blocks again it will pause again.")
+    return RedirectResponse("/settings#browser", 303)
 
 
 @router.post("/settings/{group}", dependencies=[Depends(verify_csrf)])

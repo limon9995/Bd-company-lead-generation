@@ -17,6 +17,8 @@ def get_search(db: Session):
     provider = settings_store.get(db, "search_provider")
     if provider == "none":
         return None
+    if provider in ("duckduckgo", "bing"):
+        return browser_search(db, provider)
     key = settings_store.get(db, f"{provider}_api_key")
     if not key:
         return None
@@ -25,3 +27,16 @@ def get_search(db: Session):
 
 def places_key(db: Session) -> str:
     return settings_store.get(db, "places_api_key")
+
+
+def browser_search(db: Session, engine: str):
+    """Search through a headless browser. Returns a callable like the API providers, tagged for usage stats."""
+    from app.services import browser, search_browser
+
+    def _search(q: str, num: int = 10):
+        browser.ensure_not_paused(db, engine)
+        with browser.source_lock(engine), browser.session_for(db, engine) as session:
+            return search_browser.search(session, engine, q, num)
+
+    _search.usage_key = "search_browser"
+    return _search

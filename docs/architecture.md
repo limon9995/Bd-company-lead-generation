@@ -13,7 +13,7 @@ Google Sheets is a **one-way mirror** (DB → Sheet); CRM edits happen in the ad
 
 ## Pipeline (one job per stage, idempotent)
 ```
-run_campaign ─▶ discover[i] (one per "phrase in city", chained) ─▶ crawl_company ─▶ find_decision_maker ─▶ finalize_run
+run_campaign ─▶ discover[i] | discover_maps[i] | discover_directory[url] ─▶ crawl_company ─▶ find_decision_maker ─▶ finalize_run
 ```
 * **discover** — Places Text Search (≤ 3 pages × 20). Skips permanently-closed places. Dedupe: `place_id` → website
   domain → name+phone. Facebook-only "websites" are stored as socials, never used as a domain. Page progress is saved in
@@ -27,6 +27,19 @@ run_campaign ─▶ discover[i] (one per "phrase in city", chained) ─▶ crawl
   costs −30 points. If no senior (rank ≤ 2) candidate with confidence ≥ 55 is found, it runs 2 search queries (Serper/Brave)
   and asks Gemini about the snippets; snippets that don't mention the company are rejected.
 * **finalize_run** — counters, Sheet sync, Telegram summary + cards for high-confidence leads, email drafts.
+
+### Browser-mode sources
+* **discover_maps** — Google Maps search in headless Chromium: scroll the results list, open each place page, parse
+  name / category / address / phone / website / rating from `data-item-id` and `aria-label` attributes. Places already
+  known and fresh are not opened again. Place page loads count against `maps_daily_cap`.
+* **discover_directory** — each admin-provided URL: render, Gemini lists the businesses on the page (a name must appear
+  in the page text), follow `rel=next` / "Next" links up to `directory_max_pages`.
+* **Browser search** — DuckDuckGo HTML or Bing results page instead of Serper/Brave (Settings → search provider).
+* **Facebook** — when a company has no website but a Facebook page, the public page is read without logging in;
+  a login wall is counted and skipped.
+* Politeness: random 4–9 s wait before each page load, one browser job per site (`source_lock`), a normal Chrome UA.
+* Blocks: the URL and visible text are checked for CAPTCHA / "unusual traffic" / login pages → `SourceBlocked` →
+  source paused for `blocked_pause_hours`, job postponed, one Telegram alert. No CAPTCHA solving or bypass.
 
 ### Confidence score (shown per person with the reasons)
 +40 on company's own website · +25 in a search result mentioning the company · +15 title matches campaign titles ·

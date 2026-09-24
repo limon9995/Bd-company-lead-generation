@@ -12,3 +12,11 @@ class BudgetExceeded(Exception):
 
 class ProviderError(Exception):
     """A remote API returned an error. Retried with backoff."""
+
+
+class SourceBlocked(Exception):
+    """A website showed a CAPTCHA, login wall or block page. We stop (never bypass) and pause that source."""
+
+    def __init__(self, source: str, detail: str = ""):
+        super().__init__(f"{source} blocked automated access{': ' + detail if detail else ''}")
+        self.source = source

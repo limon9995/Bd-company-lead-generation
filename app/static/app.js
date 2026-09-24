@@ -104,6 +104,13 @@
     setTimeout(tick, 2000);
   }
 
+  // Campaign form: directory fields only for the directory source
+  const dirFields = $('#dir-fields');
+  if(dirFields){
+    const sync = () => { dirFields.hidden = ($('input[name=discovery_source]:checked')?.value !== 'directory'); };
+    $$('input[name=discovery_source]').forEach(r => r.addEventListener('change', sync)); sync();
+  }
+
   // Template editor: live preview
   const tf = $('#template-form');
   if(tf){

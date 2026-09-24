@@ -5,6 +5,23 @@
 <div class="sub">Switch the market by changing the industry. Everything else can stay the same.</div></div></div>
 <form method="post" action="{{ '/campaigns/' ~ c.id if c else '/campaigns' }}"><input type="hidden" name="csrf_token" value="{{ csrf }}">
 <div class="grid g2">
+<div class="card" style="grid-column:1/-1;margin:0"><h2>Where companies come from</h2>
+  {% set src = c.discovery_source if c else 'places_api' %}
+  <div class="grid g3">
+    <label class="source-opt"><input type="radio" name="discovery_source" value="places_api" {{ 'checked' if src == 'places_api' }}>
+      <span><b>Google Places API</b><br><span class="small muted">Official and reliable. Needs an API key; ~1,000 calls/month free, then paid.</span></span></label>
+    <label class="source-opt"><input type="radio" name="discovery_source" value="maps_browser" {{ 'checked' if src == 'maps_browser' }}>
+      <span><b>Google Maps (browser)</b><br><span class="small muted">Free, no key. Slower; Google's terms don't allow it and it can be blocked — then it pauses.</span></span></label>
+    <label class="source-opt"><input type="radio" name="discovery_source" value="directory" {{ 'checked' if src == 'directory' }}>
+      <span><b>Directory URLs (browser)</b><br><span class="small muted">Any public listing page you choose, e.g. an association member list. Needs Gemini.</span></span></label>
+  </div>
+  <div id="dir-fields" class="grid g2" style="gap:0 16px">
+    <div><label for="directory_urls">Directory URLs (one per line)</label>
+    <textarea id="directory_urls" name="directory_urls" placeholder="https://example-directory.com.bd/category/hospitals">{{ c.directory_urls|join('\n') if c and c.directory_urls }}</textarea>
+    <div class="help">The browser opens each URL, Gemini lists the companies on the page, then it follows the "Next" link. Only use sites whose terms allow it.</div></div>
+    <div><label for="directory_max_pages">Max pages per URL</label><input id="directory_max_pages" type="number" name="directory_max_pages" min="1" max="50" value="{{ c.directory_max_pages if c else 5 }}"></div>
+  </div>
+</div>
 <div class="card" style="margin:0"><h2>Who to find</h2>
   <label for="name">Name</label><input id="name" type="text" name="name" value="{{ c.name if c }}" placeholder="Healthcare – Dhaka" required>
   <label for="industry_slug">Target industry</label><select id="industry_slug" name="industry_slug">

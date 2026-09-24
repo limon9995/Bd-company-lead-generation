@@ -41,13 +41,29 @@ python -m app.bootstrap                # migrations + seed industries/template
 python -m scripts.create_admin you@example.com
 uvicorn app.main:app --reload          # admin panel
 python -m app.worker                   # pipeline worker + scheduler (second terminal)
-pytest                                 # 44 tests, no network needed (external APIs are mocked)
+pytest                                 # 58 tests, no network needed (external APIs are mocked)
 ```
 
 Tests also run on Postgres: `DATABASE_URL=postgresql+psycopg://user:pw@localhost/test pytest`.
+
+## Data sources (chosen per campaign / in Settings)
+| Need | API mode (key, reliable) | Browser mode (free, headless Chromium) |
+|---|---|---|
+| Find companies | Google Places API | Google Maps pages, or any directory URL you give |
+| Decision-maker search | Serper / Brave | DuckDuckGo / Bing result pages |
+| Company details | company website crawl (always) | + public Facebook page when there is no website |
+
+Browser mode waits 4–9 s between page loads, runs one job per site at a time, and **stops** on a CAPTCHA,
+"unusual traffic" or login page — the source is paused (default 6 h, "Resume now" in Settings). It never solves
+CAPTCHAs, never logs in, and uses no stealth tricks. Google, Bing, DuckDuckGo and Facebook terms do not allow
+automated collection, so API mode remains the compliant choice.
 
 ## Honest limits
 - Company data (name, phone, address, website) coverage is high; **decision-maker coverage is not** — small BD
   businesses often don't publish leadership. The dashboard shows the *measured* hit-rate per campaign.
 - Personal emails are rarely public; pattern guesses are marked `guessed` and never auto-sent.
-- No LinkedIn login scraping and no Google Maps HTML scraping (both violate those sites' terms).
+- No LinkedIn login scraping. Browser mode for Google Maps/Search/Facebook is available but against those sites'
+  terms and can be blocked; Google changes its Maps page layout from time to time, so the Maps parser
+  (`app/services/maps_browser.py`) may need a selector update.
+- Browser-mode parsers were tested against local copies of the page structure, not the live sites (no internet in
+  the build environment) — run a small pilot first.

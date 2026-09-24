@@ -29,7 +29,9 @@ class SettingDef:
 GROUPS: list[tuple[str, str, str]] = [
     # (id, title, description)
     ("places", "Google Places API", "Company discovery (official API - no Maps scraping)."),
-    ("search", "Web Search API", "Used to find decision makers from public search results (news, public profile snippets)."),
+    ("search", "Web search", "Finds decision makers in public search results. API (Serper/Brave, needs a key) or browser mode (DuckDuckGo/Bing, free, may get blocked)."),
+    ("browser", "Browser scraping", "Headless Chromium for Google Maps, directory sites and public Facebook pages. Slower than APIs; "
+                "the site's terms may not allow it; on a CAPTCHA or block the source is paused, never bypassed."),
     ("gemini", "Gemini (AI)", "Extracts decision makers from page text and personalises emails."),
     ("telegram", "Telegram", "Lead notifications and alerts."),
     ("whatsapp", "WhatsApp Cloud API (optional)", "Official Meta API only. Requires an approved message template."),
@@ -46,10 +48,21 @@ DEFS: list[SettingDef] = [
     SettingDef("places_cost_per_call", "Est. cost per call (USD)", "places", "float", default="0.035",
                help="Estimate only, used for the dashboard. Check Google's current Places pricing and update."),
 
-    SettingDef("search_provider", "Provider", "search", "select", default="serper", options=("serper", "brave", "none")),
+    SettingDef("search_provider", "Provider", "search", "select", default="serper", options=("serper", "brave", "duckduckgo", "bing", "none"),
+               help="duckduckgo / bing = browser mode, no key needed, but slower and can be blocked."),
     SettingDef("serper_api_key", "Serper.dev API key", "search", "secret"),
     SettingDef("brave_api_key", "Brave Search API key", "search", "secret"),
     SettingDef("search_cost_per_call", "Est. cost per call (USD)", "search", "float", default="0.001"),
+
+    SettingDef("browser_delay_min", "Min wait between page loads (s)", "browser", "float", default="4"),
+    SettingDef("browser_delay_max", "Max wait between page loads (s)", "browser", "float", default="9"),
+    SettingDef("maps_max_results", "Google Maps: max places per search phrase", "browser", "int", default="40"),
+    SettingDef("maps_daily_cap", "Google Maps: max place pages per day", "browser", "int", default="400"),
+    SettingDef("browser_search_daily_cap", "Browser search: max searches per day", "browser", "int", default="200"),
+    SettingDef("facebook_pages", "Read public Facebook pages when a company has no website", "browser", "bool", default="true"),
+    SettingDef("blocked_pause_hours", "Pause a source after it blocks us (hours)", "browser", "int", default="6"),
+    SettingDef("browser_proxy", "Proxy (optional)", "browser",
+               help="e.g. http://user:pass@host:port - only a proxy you are allowed to use. Leave empty for direct."),
 
     SettingDef("gemini_api_key", "API key", "gemini", "secret", help="https://aistudio.google.com → Get API key."),
     SettingDef("gemini_model", "Model", "gemini", default="gemini-flash-lite-latest",

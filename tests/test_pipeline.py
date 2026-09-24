@@ -14,7 +14,7 @@ from tests.fakes import FakePlaces, RuleLLM, fake_crawl, fake_search, place
 @pytest.fixture
 def world(monkeypatch, configure):
     configure(places_api_key="places-key", gemini_api_key="gem-key", telegram_bot_token="123:abc",
-              telegram_chat_id="999", serper_api_key="serper-key")
+              telegram_chat_id="999", serper_api_key="serper-key", facebook_pages="false")
     fp = FakePlaces({
         "hospital": [[place(1, "https://www.acme.com.bd"), place(2, "https://www.facebook.com/clinic2"),
                       place(3, "", status="CLOSED_PERMANENTLY")], [place(4, "https://beta.com.bd")]],

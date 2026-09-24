@@ -15,7 +15,7 @@ A private, self-hosted web application with an **admin panel**. You paste your A
 
 | Step | How | Output |
 |---|---|---|
-| Find companies | Official **Google Places API**, e.g. "hospital in Dhaka" | Name, category, address, phone, website, Google rating, Maps link |
+| Find companies | Official **Google Places API**, or **Google Maps / directory pages in a headless browser** (free mode) | Name, category, address, phone, website, Google rating, Maps link |
 | Read company websites | Our crawler (HTTP + headless Chromium via Playwright) visits About / Board / Management / Contact pages | Emails, phones, Facebook/LinkedIn pages, leadership text |
 | Find decision maker | **Google Gemini** AI reads those pages; if needed, a web-search API looks at public news/profile snippets | Name, title, **source link**, **confidence score** |
 | Store | Admin panel CRM (status, notes, owner) + automatic **Google Sheet** copy + CSV export | |
@@ -39,27 +39,39 @@ numbers from a pilot run (e.g. 50 companies) before scaling. Every name comes wi
 not allowed to "invent" people: a name that is not literally in the source page is thrown away.
 
 ## 4. Data sources & legality
-| Source | How we use it | Why it's safe |
-|---|---|---|
-| Google Places API | Official paid API | Allowed under Google's terms (unlike scraping Google Maps pages) |
-| Company websites | Public pages only, robots.txt respected, slow request rate | Publicly published business information |
-| Search API (Serper / Brave) | Public search results only | Licensed API; we only read snippets |
-| LinkedIn | **Not scraped.** Only public search-result snippets and a link for manual checking | LinkedIn's terms forbid scraping; logged-in scraping gets accounts banned |
-| WhatsApp | Only the official Meta Cloud API | Unofficial WhatsApp bots get numbers banned |
+Each campaign chooses where companies come from. Both modes are built; the choice is a trade-off between cost and
+compliance.
+
+| Source | Mode | Cost | Terms of service | Reliability |
+|---|---|---|---|---|
+| Google Places API | API | ~1,000 calls/month free, then ~$35 / 1,000 | Allowed | High |
+| Google Maps pages | Browser | Free | **Not allowed** by Google's terms | Can be blocked; layout changes need fixes |
+| Directory websites you choose | Browser | Free (+ Gemini) | Depends on each site — check first | Good for member lists / directories |
+| Company websites | Browser/HTTP | Free | Public pages, robots.txt respected | High |
+| Serper / Brave search | API | 2,500 free, then from $50 / 50k | Allowed | High |
+| DuckDuckGo / Bing pages | Browser | Free | **Not allowed** by their terms | Can be blocked |
+| Public Facebook pages | Browser | Free | **Not allowed** by Meta's terms; no login | Often shows a login wall |
+| LinkedIn | — | — | Not scraped; only public search snippets + a link | — |
+| WhatsApp | Official Cloud API only | Meta per-message | Allowed | High |
+
+Safeguards in browser mode: slow, human-paced page loads (4–9 s), one job per site at a time, and an automatic pause
+when a site shows a CAPTCHA, "unusual traffic" or login page. The system never solves CAPTCHAs, never logs in and
+does not disguise itself. **Recommendation:** start the pilot in browser mode to keep cost at zero, and use the API
+sources for regular production use — they are the options that fit the providers' terms.
 
 Emails include an unsubscribe link and honour it automatically. Bangladesh's personal-data protection rules are still
 evolving — please have your legal team confirm your outreach policy. The system stores business contact information only.
 
 ## 5. Technology
-Python (FastAPI) · PostgreSQL · Playwright/Chromium · Google Places API (New) · Google Gemini API · Serper.dev or Brave
+Python (FastAPI) · PostgreSQL · Playwright/Chromium (website crawl + browser mode) · Google Places API (New) · Google Gemini API · Serper.dev or Brave
 Search API · Telegram Bot API · Gmail SMTP · Google Sheets API · Docker. All code and data stay on your server.
 
 ## 6. Running costs (per month, estimates — Sept 2026 prices)
 | Item | Cost | Notes |
 |---|---|---|
 | VPS server (2 vCPU / 4 GB) | ~ $6 – 25 | Hetzner / Contabo cheaper; DigitalOcean more expensive |
-| Google Places API | **$0** for ~1,000 calls/month, then ~$35 per 1,000 calls | 1 call returns up to 20 companies → free tier covers several thousand companies/month. Needs a billing card. |
-| Search API (Serper) | $0 for the first 2,500 queries, then from $50 per 50,000 | ~2 queries per company that needs it |
+| Google Places API | **$0** for ~1,000 calls/month, then ~$35 per 1,000 calls — or $0 in browser mode | 1 call returns up to 20 companies. Needs a billing card. |
+| Search API (Serper) | $0 for the first 2,500 queries, then from $50 per 50,000 — or $0 in browser mode | ~2 queries per company that needs it |
 | Gemini API | $0 on free tier (rate-limited) or roughly a few USD per 1,000 companies on paid tier | Free tier data may be used by Google to improve products |
 | Gmail SMTP, Telegram, Google Sheets | $0 | Keep to ~30–50 emails/day on one Gmail account |
 | WhatsApp Cloud API (optional) | Meta per-message charge | |
