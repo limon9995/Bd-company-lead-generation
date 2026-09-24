@@ -56,6 +56,13 @@
 <td style="min-width:120px"><div class="row" style="gap:8px"><div class="bar grow"><span style="width:{{ r.rate }}%"></span></div><span class="num small">{{ r.rate }}%</span></div></td></tr>
 {% else %}<tr><td colspan="4">{{ empty("No campaigns yet.", "/campaigns/new", "Create one") }}</td></tr>{% endfor %}</tbody></table></div></div>
 
+<div class="card flush"><div class="card-head"><h2>Right person? (your feedback)</h2></div>
+<p class="small muted" style="padding:0 20px">From the ✓ Correct / ✗ Wrong marks on lead pages. Focus on the industries and cities at the top.</p>
+<div class="table-wrap"><table><thead><tr><th>Industry</th><th>City</th><th>✓</th><th>✗</th><th>Correct</th></tr></thead><tbody>
+{% for a in accuracy %}<tr><td>{{ a.industry }}</td><td>{{ a.city }}</td><td class="num">{{ a.correct }}</td><td class="num">{{ a.wrong }}</td>
+<td style="min-width:120px"><div class="row" style="gap:8px"><div class="bar grow"><span style="width:{{ a.rate }}%"></span></div><span class="num small">{{ a.rate }}%</span></div></td></tr>
+{% else %}<tr><td colspan="5"><div class="empty">No feedback yet - open a lead and mark its decision maker ✓ Correct or ✗ Wrong.</div></td></tr>{% endfor %}</tbody></table></div></div>
+
 <div class="card flush"><div class="card-head"><h2>API usage</h2><span class="small muted">estimated cost</span></div>
 <div class="table-wrap"><table><thead><tr><th>Day</th><th>Provider</th><th>Calls</th><th>Est. USD</th></tr></thead><tbody>
 {% for u in usage %}<tr><td class="nowrap">{{ u.day }}</td><td>{{ u.provider }}</td><td class="num">{{ u.calls }}</td><td class="num">${{ '%.3f'|format(u.est_cost_usd) }}</td></tr>

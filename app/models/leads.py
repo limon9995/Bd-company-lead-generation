@@ -80,6 +80,8 @@ class Person(TimestampMixin, Base):
     sources: Mapped[list] = mapped_column(JSON, default=list)  # [{"kind": "website"|"search", "url": ...}]
     confidence: Mapped[int] = mapped_column(Integer, default=0)
     confidence_breakdown: Mapped[list] = mapped_column(JSON, default=list)
+    # admin feedback on the lead page: "" | "correct" | "wrong". A "wrong" person is never chosen as the contact again.
+    feedback: Mapped[str] = mapped_column(String(10), default="")
 
     company: Mapped[Company] = relationship(back_populates="people")
 

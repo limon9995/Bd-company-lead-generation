@@ -10,6 +10,11 @@ TITLE_RANKS: list[tuple[int, tuple[str, ...]]] = [
 ]
 _MD = re.compile(r"\bM\.?D\b")
 _MEDICAL_DEGREE = re.compile(r"mbbs|fcps|frcs|mrcp|md\s*\(", re.I)
+# "Director of Finance / of Admissions" runs a function; it is not an owner or board director.
+_FUNCTIONAL_DIRECTOR = re.compile(r"\bdirector\s+(of|for)\b", re.I)
+# Pages where a company lists its own leadership (URL path words).
+LEADERSHIP_PAGE = re.compile(r"board|trustee|leadership|management|authorit|chairman|founder|message|director|"
+                             r"governing|chancellor|principal|\bmd\b|ceo|about|who-we-are|our-people|team", re.I)
 
 
 def title_rank(title: str) -> int:
@@ -19,8 +24,19 @@ def title_rank(title: str) -> int:
         return 1
     for rank, words in TITLE_RANKS:
         if any(w in t for w in words):
-            return rank
+            if rank == 1:
+                return 1
+            return 3 if _FUNCTIONAL_DIRECTOR.search(t) else rank
     return 9
+
+
+def prominence(sources: list[dict]) -> int:
+    """Tie-breaker between people of equal rank and score: named on a leadership page, and on more pages."""
+    from urllib.parse import urlparse
+
+    urls = {s.get("url", "") for s in sources or [] if s.get("kind") == "website"}
+    on_leadership_page = any(LEADERSHIP_PAGE.search(urlparse(u).path) for u in urls)
+    return (2 if on_leadership_page else 0) + min(len(urls), 3)
 
 
 def matches_target(title: str, targets: list[str]) -> bool:

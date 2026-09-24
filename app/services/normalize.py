@@ -63,9 +63,19 @@ def name_key(name: str) -> str:
     return re.sub(r"\s+", " ", s).strip()
 
 
+# Honorifics and ranks that vary between pages ("Barrister Shameem Haider Patwary" = "Shameem Haider Patwary").
+_PERSON_HONORIFICS = re.compile(
+    r"\b(mr|mrs|ms|miss|dr|prof|professor|engr|eng|md|mohd|mohammad|mohammed|muhammad|barrister|adv|advocate|"
+    r"justice|sir|emeritus|alhaj|al-haj|hajee|haji|brig|brigadier|gen|general|maj|major|col|colonel|lt|capt|"
+    r"captain|retd|phd|fca|fcma)\b\.?")
+_BN_PERSON_HONORIFICS = re.compile(unicodedata.normalize(
+    "NFKC", r"(^|\s)(মোঃ|মো\.|মোহাঃ|ড\.|ডঃ|ডা\.|ডাঃ|প্রফেসর|অধ্যাপক|প্রকৌশলী|জনাব|আলহাজ্ব|আলহাজ|হাজী)(?=\s|$)"))
+
+
 def person_key(name: str) -> str:
     s = unicodedata.normalize("NFKC", name or "").lower()
-    s = re.sub(r"\b(mr|mrs|ms|dr|prof|engr|md|mohammad|mohammed|muhammad)\b\.?", " ", s)
+    s = _BN_PERSON_HONORIFICS.sub(" ", s)
+    s = _PERSON_HONORIFICS.sub(" ", s)
     s = re.sub(r"[^\w\s]", " ", s)
     return re.sub(r"\s+", " ", s).strip()
 
@@ -108,6 +118,11 @@ def find_emails(text: str) -> list[str]:
         e = m.group(0).strip(".").lower()
         if e.endswith(_BAD_EMAIL_SUFFIXES) or "example." in e or e.startswith(("u00", "sentry")):
             continue
+        local = e.split("@")[0]
+        if local.startswith(".") or local.endswith(".") or ".." in local:
+            continue  # scraped fragment like "doorstep.@site.com" - not a real address
+        if e.split("@")[-1] in ("demolink.org",):
+            continue  # web-template placeholder addresses
         if e not in out:
             out.append(e)
     return out

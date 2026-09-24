@@ -10,7 +10,7 @@ from app.db import get_db
 from app.deps import audit, current_user, flash, render, verify_csrf
 from app.models import CRM_STATUSES, Campaign, Company, EmailMessage, EmailTemplate, Lead, Person, User
 from app.pipeline.emails import is_suppressed, make_draft, outreach_address
-from app.pipeline.stages import lead_row
+from app.pipeline.stages import campaign_targets, lead_row, primary_candidates, set_primary
 from app.services.sheets import LEAD_HEADERS
 
 router = APIRouter()
@@ -133,7 +133,10 @@ def lead_detail(lid: int, request: Request, user: User = Depends(current_user), 
     if lead is None:
         raise HTTPException(404)
     return render(request, "lead_detail.html", {
-        "lead": lead, "company": lead.company, "people": sorted(lead.company.people, key=lambda p: -p.confidence),
+        "lead": lead, "company": lead.company,
+        # best contact first, people marked wrong last
+        "people": (primary_candidates(lead.company, campaign_targets(db, lead.campaign))
+                   + [p for p in lead.company.people if p.feedback == "wrong"]),
         "messages": db.scalars(select(EmailMessage).where(EmailMessage.lead_id == lid).order_by(EmailMessage.id.desc())).all(),
         "statuses": CRM_STATUSES, "templates_": db.scalars(select(EmailTemplate)).all(),
     })
@@ -148,14 +151,50 @@ def lead_update(lid: int, request: Request, crm_status: str = Form(...), notes: 
     lead.crm_status, lead.notes, lead.owner = crm_status, notes, owner.strip()
     if primary_person_id:
         pid = int(primary_person_id)
-        if any(p.id == pid for p in lead.company.people):
-            lead.primary_person_id = pid
+        chosen = next((p for p in lead.company.people if p.id == pid), None)
+        if chosen is not None and pid != lead.primary_person_id:
+            set_primary(lead.company, lead, chosen)  # also picks the new contact's email
     if crm_status == "do_not_contact":
         for m in db.scalars(select(EmailMessage).where(EmailMessage.lead_id == lid, EmailMessage.status.in_(["draft", "approved"]))):
             m.status, m.error = "cancelled", "lead marked do-not-contact"
     audit(db, user, "lead.update", str(lid), crm_status)
     db.commit()
     flash(request, "Lead updated.")
+    return RedirectResponse(f"/leads/{lid}", 303)
+
+
+@router.post("/leads/{lid}/people/{pid}/feedback", dependencies=[Depends(verify_csrf)])
+def person_feedback(lid: int, pid: int, request: Request, verdict: str = Form(...),
+                    user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """✓ correct: this is the right contact (becomes the primary). ✗ wrong: never use this person again for
+    this company - every lead that had them as contact moves to the next best person, and their open
+    drafts are cancelled. clear: undo."""
+    lead = db.get(Lead, lid)
+    person = db.get(Person, pid)
+    if lead is None or person is None or person.company_id != lead.company_id or verdict not in ("correct", "wrong", "clear"):
+        raise HTTPException(400)
+    company = lead.company
+    person.feedback = "" if verdict == "clear" else verdict
+    if verdict == "correct":
+        set_primary(company, lead, person)
+    elif verdict == "wrong":
+        wrong_email = person.email
+        for other in db.scalars(select(Lead).where(Lead.primary_person_id == person.id)).all():
+            ranked = primary_candidates(company, campaign_targets(db, other.campaign))
+            set_primary(company, other, ranked[0] if ranked else None)
+        # unsent emails written for this person ("Dear Rahim ...") are wrong wherever they were going
+        written_for = [EmailMessage.person_id == person.id]
+        if wrong_email:
+            written_for.append(EmailMessage.to_email == wrong_email)
+        for m in db.scalars(select(EmailMessage).join(Lead, EmailMessage.lead_id == Lead.id)
+                            .where(Lead.company_id == company.id, or_(*written_for),
+                                   EmailMessage.status.in_(["draft", "approved"]))):
+            m.status, m.error = "cancelled", "contact marked as the wrong person"
+    audit(db, user, "person.feedback", f"{pid}:{person.full_name}"[:200], verdict)
+    db.commit()
+    flash(request, {"correct": f"Marked {person.full_name} as correct - now the contact for this lead.",
+                    "wrong": f"Marked {person.full_name} as wrong - they won't be used for this company again.",
+                    "clear": f"Cleared feedback for {person.full_name}."}[verdict])
     return RedirectResponse(f"/leads/{lid}", 303)
 
 

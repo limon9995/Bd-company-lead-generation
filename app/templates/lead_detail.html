@@ -29,14 +29,21 @@
 <input type="email" name="to_email" placeholder="to (optional override)" style="width:220px" aria-label="Recipient override"><button class="btn">Create draft</button></form>
 </div></div>
 <div class="card flush"><div class="card-head"><h2>Decision makers found</h2></div>
-<p class="small muted" style="padding:0 20px">A person is kept only if their name appears in the source text. Open the source before contacting.</p>
-<div class="table-wrap"><table><thead><tr><th>Person</th><th>Email</th><th>Confidence</th><th>Why this score</th><th>Evidence</th></tr></thead><tbody>
-{% for p in people %}<tr><td><b>{{ p.full_name }}</b><div class="small muted">{{ p.title }}</div>{% if p.linkedin_url %}<a class="small" href="{{ p.linkedin_url }}" target="_blank" rel="noopener">Public LinkedIn result</a>{% endif %}</td>
-<td class="small">{{ p.email or '—' }} {% if p.email %}<span class="pill">{{ p.email_status }}</span>{% endif %}</td>
+<p class="small muted" style="padding:0 20px">A person is kept only if their name appears in the source text. Open the source before contacting.
+Mark each one <b>✓ Correct</b> or <b>✗ Wrong</b> - a wrong person is never used for this company again, and the dashboard learns which campaigns find the right people.</p>
+<div class="table-wrap"><table><thead><tr><th>Person</th><th>Email</th><th>Confidence</th><th>Why this score</th><th>Evidence</th><th>Right person?</th></tr></thead><tbody>
+{% for p in people %}<tr class="{{ 'faint' if p.feedback == 'wrong' }}"><td><b>{{ p.full_name }}</b>{% if lead.primary_person_id == p.id %} <span class="pill high">contact</span>{% endif %}
+<div class="small muted">{{ p.title }}</div>{% if p.linkedin_url %}<a class="small" href="{{ p.linkedin_url }}" target="_blank" rel="noopener">Public LinkedIn result</a>{% endif %}</td>
+<td class="small">{{ p.email or '—' }} {% if p.email %}<span class="pill" title="{{ {'found': 'seen on the website', 'pattern': 'built from this company\'s address format - check before sending', 'company': 'general company address', 'guessed': 'a guess - check before sending'}.get(p.email_status, '') }}">{{ p.email_status }}</span>{% endif %}</td>
 <td><span class="pill {{ p.confidence|bucket }}">{{ p.confidence }}</span></td>
 <td class="small">{% for w in p.confidence_breakdown %}<div>{{ w }}</div>{% endfor %}</td>
-<td class="small">{% if p.evidence %}<div>“{{ p.evidence }}”</div>{% endif %}{% for s in p.sources %}<a href="{{ s.url }}" target="_blank" rel="noopener">{{ s.kind }} source</a>{{ ' · ' if not loop.last }}{% endfor %}</td></tr>
-{% else %}<tr><td colspan="5"><div class="empty">No decision maker found for this company.</div></td></tr>{% endfor %}</tbody></table></div></div>
+<td class="small">{% if p.evidence %}<div>“{{ p.evidence }}”</div>{% endif %}{% for s in p.sources %}<a href="{{ s.url }}" target="_blank" rel="noopener">{{ s.kind }} source</a>{{ ' · ' if not loop.last }}{% endfor %}</td>
+<td class="nowrap">{% if p.feedback %}<span class="pill {{ 'high' if p.feedback == 'correct' else 'error' }}">{{ '✓ correct' if p.feedback == 'correct' else '✗ wrong' }}</span>{% endif %}
+<form method="post" action="/leads/{{ lead.id }}/people/{{ p.id }}/feedback" class="row" style="gap:4px;margin-top:4px"><input type="hidden" name="csrf_token" value="{{ csrf }}">
+{% if p.feedback != 'correct' %}<button class="btn sm" name="verdict" value="correct" title="This is the right person to contact">✓ Correct</button>{% endif %}
+{% if p.feedback != 'wrong' %}<button class="btn sm" name="verdict" value="wrong" title="Wrong person - never use for this company">✗ Wrong</button>{% endif %}
+{% if p.feedback %}<button class="btn sm" name="verdict" value="clear">Undo</button>{% endif %}</form></td></tr>
+{% else %}<tr><td colspan="6"><div class="empty">No decision maker found for this company.</div></td></tr>{% endfor %}</tbody></table></div></div>
 <div class="card flush"><div class="card-head"><h2>Emails</h2></div><div class="table-wrap"><table><thead><tr><th>#</th><th>To</th><th>Subject</th><th>Status</th><th>Sent</th></tr></thead><tbody>
 {% for m in messages %}<tr><td><a href="/outbox/{{ m.id }}">#{{ m.id }}</a></td><td>{{ m.to_email }}</td><td>{{ m.subject }}</td><td><span class="pill {{ m.status }}">{{ m.status }}</span></td><td>{{ m.sent_at|local }}</td></tr>
 {% else %}<tr><td colspan="5"><div class="empty">No emails yet.</div></td></tr>{% endfor %}</tbody></table></div></div>

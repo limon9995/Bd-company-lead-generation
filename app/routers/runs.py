@@ -12,7 +12,8 @@ from app.config import config
 from app.setup_status import checklist, progress
 from app.db import get_db
 from app.deps import audit, current_user, flash, render, verify_csrf
-from app.models import ApiUsage, AuditLog, Campaign, EmailMessage, Job, Lead, Person, Run, User
+from app.models import (ApiUsage, AuditLog, Campaign, Company, EmailMessage, IndustryPreset, Job, Lead, Person, Run,
+                        User)
 from app.pipeline.queue import now
 from app.pipeline.stages import cancel_run, run_progress, sync_leads_to_sheet
 from app.services.errors import ProviderError
@@ -64,6 +65,25 @@ def leads_per_day(db: Session, days: int = 14) -> dict:
     return {"rows": rows, "ticks": ticks, "total": sum(r["n"] for r in rows), "has_data": top > 0}
 
 
+def feedback_accuracy(db: Session) -> list[dict]:
+    """Share of people marked correct (vs wrong) on lead pages, per industry and city - best first."""
+    names = {p.slug: p.name for p in db.scalars(select(IndustryPreset))}
+    groups: dict[tuple[str, str], dict] = {}
+    rows = db.execute(select(Company.industry_slug, Company.city, Person.feedback, func.count(Person.id))
+                      .join(Company, Person.company_id == Company.id)
+                      .where(Person.feedback.in_(["correct", "wrong"]))
+                      .group_by(Company.industry_slug, Company.city, Person.feedback))
+    for industry, city, verdict, n in rows:
+        g = groups.setdefault((industry or "", city or ""), {
+            "industry": names.get(industry, industry or "—"), "city": city or "—", "correct": 0, "wrong": 0})
+        g[verdict] += n
+    out = []
+    for g in groups.values():
+        total = g["correct"] + g["wrong"]
+        out.append({**g, "total": total, "rate": round(100 * g["correct"] / total) if total else 0})
+    return sorted(out, key=lambda g: (-g["rate"], -g["total"]))
+
+
 @router.get("/setup")
 def setup_page(request: Request, user: User = Depends(current_user), db: Session = Depends(get_db)):
     steps = checklist(db)
@@ -95,7 +115,7 @@ def dashboard(request: Request, user: User = Depends(current_user), db: Session 
         "chart": leads_per_day(db), "steps": steps, "setup_done": setup_done, "setup_total": setup_total,
         "total": total_leads, "with_dm": with_dm, "high": high, "sent_7d": sent_7d, "drafts": drafts,
         "rate": round(100 * with_dm / total_leads) if total_leads else 0, "per_campaign": per_campaign,
-        "usage": usage, "warnings": warnings,
+        "usage": usage, "warnings": warnings, "accuracy": feedback_accuracy(db),
         "runs": db.scalars(select(Run).order_by(Run.id.desc()).limit(8)).all(),
         "failed_jobs": db.scalar(select(func.count(Job.id)).where(Job.status == "failed")) or 0,
     })

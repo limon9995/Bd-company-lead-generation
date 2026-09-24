@@ -1,5 +1,6 @@
 """Pipeline stages. Each stage is one job type; stages are idempotent so retries/restarts are safe."""
 import logging
+import re
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, select
@@ -14,7 +15,7 @@ from app.services.email_finder import choose_email
 from app.services.errors import ProviderError, RetryLater, SkipStage, SourceBlocked
 from app.services.extractor import Source, extract_candidates, merge_and_score, search_queries
 from app.services.normalize import name_key, normalize_bd_phone, normalize_domain, person_key, social_kind
-from app.services.scoring import bucket
+from app.services.scoring import bucket, prominence
 from app.services.title_matcher import find_people
 from app.services.usage import check_budget, record_call
 
@@ -459,9 +460,71 @@ def read_facebook(db: Session, run: Run, company: Company, fb_url: str) -> None:
 
 
 # ---------------------------------------------------------------- decision maker
+def _existing_people(db: Session, company: Company) -> dict[str, Person]:
+    """People of a company by person_key. Rows saved under an older, stricter key ("Barrister X" and "X") are
+    merged: the one with feedback, else the higher confidence, is kept; leads pointing at the other move over."""
+    by_key: dict[str, Person] = {}
+    for p in sorted(company.people, key=lambda p: (not p.feedback, -(p.confidence or 0), p.id or 0)):
+        k = person_key(p.full_name)
+        keep = by_key.get(k)
+        if keep is None:
+            by_key[k] = p
+            continue
+        keep.feedback = keep.feedback or p.feedback
+        keep.linkedin_url = keep.linkedin_url or p.linkedin_url
+        keep.sources = (keep.sources or []) + [s for s in (p.sources or []) if s not in (keep.sources or [])]
+        for lead in db.scalars(select(Lead).where(Lead.primary_person_id == p.id)):
+            lead.primary_person_id = keep.id
+        company.people.remove(p)
+        db.delete(p)
+    db.flush()
+    for k, p in by_key.items():
+        p.name_key = k
+    return by_key
+
+
+_DEPUTY = re.compile(r"\b(vice|deputy|pro|assistant|associate|co|additional|joint)\b")
+
+
+def target_order(title: str, targets: list[str]) -> float:
+    """Position of the title in the campaign's target titles (listed most senior first). A deputy of a target
+    ("Vice Chairman", "Co-Chairman" for target "Chairman") sorts half a step after it."""
+    t = re.sub(r"[\s\-]+", " ", (title or "").lower())
+    for i, target in enumerate(targets or []):
+        g = re.sub(r"[\s\-]+", " ", target.lower().strip())
+        if g and re.search(r"\b" + re.escape(g) + r"\b", t):
+            extra = set(_DEPUTY.findall(t)) - set(_DEPUTY.findall(g))  # "pro" in Pro-Vice-Chancellor
+            return i + (0.5 if extra else 0)
+    return len(targets or [])
+
+
+def primary_candidates(company: Company, targets: list[str] | None = None) -> list[Person]:
+    """Who to contact, best first: people marked correct, then seniority, the campaign's title order, score and
+    page prominence. People marked wrong are never offered."""
+    return sorted((p for p in company.people if p.feedback != "wrong"),
+                  key=lambda p: (p.feedback != "correct", p.seniority_rank, target_order(p.title, targets),
+                                 -(p.confidence or 0), -prominence(p.sources)))
+
+
+def set_primary(company: Company, lead: Lead, primary: Person | None) -> tuple[str, str]:
+    """Make `primary` the lead's contact and pick their email. Returns (email, status)."""
+    from app.services.email_finder import mail_domain_status, personal_match
+
+    site_emails = company.generic_emails or []
+    # other staff addresses on the site teach the company's format (rahim.uddin@ -> karim.ahmed@)
+    known = [(p.full_name, e) for p in company.people if p is not primary
+             for e in [personal_match(p.full_name, site_emails)] if e]
+    email, status = choose_email(primary.full_name if primary else "", site_emails, company.domain,
+                                 known=known, mail_ok=mail_domain_status, title=primary.title if primary else "")
+    if primary is not None:
+        primary.email, primary.email_status = email, status
+    lead.primary_person_id = primary.id if primary else None
+    return email, status
+
+
 def _save_people(db: Session, company: Company, cands) -> list[Person]:
     saved = []
-    existing = {p.name_key: p for p in company.people}
+    existing = _existing_people(db, company)
     for c in cands:
         k = person_key(c.name)
         p = existing.get(k)
@@ -532,12 +595,11 @@ def find_decision_maker(db: Session, job: Job) -> None:
                           "A Serper or Brave API key (Settings → Web search) avoids this.")
         cands += extract(search_sources)
     scored = merge_and_score(cands, targets)
-    people = _save_people(db, company, scored)
-    primary = people[0] if people else None
-    email, status = choose_email(primary.full_name if primary else "", company.generic_emails or [], company.domain)
+    _save_people(db, company, scored)
+    ranked = primary_candidates(company, targets)
+    primary = ranked[0] if ranked else None
+    email, status = set_primary(company, lead, primary)
     if primary is not None:
-        primary.email, primary.email_status = email, status
-        lead.primary_person_id = primary.id
         bump(run, "dm_found")
         bump(run, f"dm_{bucket(primary.confidence)}")
     if email:

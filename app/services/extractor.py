@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 
 from app.services.llm import LLMProvider
 from app.services.normalize import name_key, person_key, squash_ws
-from app.services.scoring import bucket, score, title_rank
+from app.services.scoring import bucket, prominence, score, title_rank
 
 log = logging.getLogger(__name__)
 
@@ -137,7 +137,7 @@ def merge_and_score(cands: list[Candidate], targets: list[str]) -> list[Candidat
     for c in merged.values():
         c.confidence, c.breakdown = score(on_website=c.on_website, in_search=c.in_search, title=c.title,
                                           targets=targets, evidence_exact=c.evidence_exact)
-    return sorted(merged.values(), key=lambda c: (c.rank, -c.confidence))
+    return sorted(merged.values(), key=lambda c: (c.rank, -c.confidence, -prominence(c.sources)))
 
 
 def search_queries(company: str, city: str, targets: list[str]) -> list[str]:

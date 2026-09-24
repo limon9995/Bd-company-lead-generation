@@ -21,6 +21,12 @@ from app.seed import seed  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
+def no_dns(monkeypatch):
+    """No real DNS in tests: every mail domain is 'unknown' (= usable) unless a test says otherwise."""
+    monkeypatch.setattr("app.services.email_finder.mail_domain_status", lambda domain: "unknown")
+
+
+@pytest.fixture(autouse=True)
 def fresh_db():
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)

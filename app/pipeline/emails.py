@@ -88,11 +88,13 @@ def make_draft(db: Session, lead: Lead, tpl: EmailTemplate, to_email: str) -> Em
 
 
 def outreach_address(lead: Lead) -> tuple[str, str]:
+    from app.services.email_finder import generic_company_email
+
     p = lead.primary_person
     if p and p.email:
         return p.email, p.email_status
-    emails = lead.company.generic_emails or []
-    return (emails[0], "company") if emails else ("", "unknown")
+    e = generic_company_email(lead.company.generic_emails or [], lead.company.domain)
+    return (e, "company") if e else ("", "unknown")
 
 
 def create_drafts_for_leads(db: Session, campaign: Campaign, tpl: EmailTemplate | None, leads: list[Lead]) -> int:
