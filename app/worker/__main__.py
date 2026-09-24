@@ -10,6 +10,9 @@ from app.worker.scheduler import CampaignScheduler
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("worker")
+from app.redact import install_log_filter  # noqa: E402
+
+install_log_filter()
 
 
 def main() -> None:

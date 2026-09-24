@@ -87,6 +87,9 @@ async def save_group(group: str, request: Request, user: User = Depends(current_
     if changed:
         audit(db, user, "settings.update", group, ", ".join(changed))  # never log values
     db.commit()
+    from app.redact import refresh
+
+    refresh()  # new keys are hidden from error messages immediately
     flash(request, f"Saved {len(changed)} setting(s)." if changed else "No changes.")
     return RedirectResponse(f"/settings#{group}", 303)
 
@@ -185,6 +188,9 @@ def test_group(group: str, user: User = Depends(current_user), db: Session = Dep
         ok, message = True, fn(db)
     except Exception as exc:  # noqa: BLE001 - show any failure to the admin
         ok, message = False, str(exc)[:500]
+    from app.redact import redact
+
+    message = redact(message)
     settings_store.record_test(db, group, ok, message)
     db.commit()
     return JSONResponse({"ok": ok, "message": message})
@@ -200,7 +206,9 @@ def detect_chat(user: User = Depends(current_user), db: Session = Depends(get_db
     try:
         chats = telegram_detect_chats(token)
     except ProviderError as exc:
-        return JSONResponse({"ok": False, "message": str(exc)})
+        from app.redact import redact
+
+        return JSONResponse({"ok": False, "message": redact(exc)})
     if not chats:
         return JSONResponse({"ok": False, "message": "No chats found. Open your bot in Telegram, send /start, then try again."})
     chosen = chats[-1]

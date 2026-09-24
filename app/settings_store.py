@@ -70,7 +70,7 @@ DEFS: list[SettingDef] = [
     SettingDef("block_retry_minutes", "After a CAPTCHA/block: wait, then try once more (minutes)", "browser", "int",
                default="30", help="One calm retry the normal way. If blocked again: switch to the API or pause. 0 = no retry."),
     SettingDef("blocked_pause_hours", "Pause a source after it blocks us (hours)", "browser", "int", default="6"),
-    SettingDef("browser_proxy", "Proxy (optional)", "browser",
+    SettingDef("browser_proxy", "Proxy (optional)", "browser", "secret",
                help="e.g. http://user:pass@host:port - only a proxy you are allowed to use. Leave empty for direct."),
 
     SettingDef("gemini_api_key", "API key", "gemini", "secret", help="https://aistudio.google.com → Get API key."),
@@ -188,6 +188,9 @@ def record_test(db: Session, group: str, ok: bool, message: str) -> None:
     if row is None:
         row = Setting(key=key, is_secret=False)
         db.add(row)
+    from app.redact import redact
+
+    message = redact(message)
     row.value_encrypted = encrypt(f"{'ok' if ok else 'fail'}|{datetime.now(timezone.utc).isoformat()}|{message[:300]}")
 
 

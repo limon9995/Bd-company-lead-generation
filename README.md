@@ -11,7 +11,18 @@ Campaign (industry + cities) ─▶ Google Places API ─▶ company website cra
       ─▶ search fallback ─▶ confidence score + source ─▶ Leads / Google Sheet ─▶ Telegram ─▶ Outbox ─▶ Gmail SMTP
 ```
 
-## Quick start (Docker)
+## Run it on your own computer (easiest)
+1. Install and start **Docker Desktop** (https://www.docker.com/products/docker-desktop/).
+2. Unzip this project, then **Windows:** double-click `start.bat` · **Mac/Linux:** run `./start.sh`.
+   It creates the secrets file, builds and starts everything (first time 5–10 min), asks for your admin email and
+   password, and opens http://localhost:8000. Stop with `stop.bat` / `./stop.sh`; data is kept.
+3. In the panel: **Setup checklist** → add your API keys in **Settings** → **Test** → create a campaign → **Run now**.
+
+API keys are entered only in the panel, stored encrypted (the key to decrypt them is in `.env`, which never leaves
+your computer), never shown again, and hidden from every error message and log. The panel listens on
+`127.0.0.1` only, so no other device can open it unless you change `WEB_BIND`.
+
+## Quick start (Docker, manual)
 
 ```bash
 cp .env.example .env
@@ -41,7 +52,7 @@ python -m app.bootstrap                # migrations + seed industries/template
 python -m scripts.create_admin you@example.com
 uvicorn app.main:app --reload          # admin panel
 python -m app.worker                   # pipeline worker + scheduler (second terminal)
-pytest                                 # 70 tests, no network needed (external APIs are mocked)
+pytest                                 # 74 tests, no network needed (external APIs are mocked)
 ```
 
 Tests also run on Postgres: `DATABASE_URL=postgresql+psycopg://user:pw@localhost/test pytest`.

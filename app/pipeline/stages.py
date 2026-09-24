@@ -22,6 +22,9 @@ MAX_PLACES_PAGES = 3  # Places Text Search returns at most 60 results (3 x 20)
 
 
 def add_note(run: Run | None, text: str) -> None:
+    from app.redact import redact
+
+    text = redact(text)
     if run is not None and text not in (run.notes or []):
         run.notes = [*(run.notes or []), text]
 

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.db import is_postgres
 from app.models import Job
+from app.redact import redact
 
 _sqlite_claim_lock = threading.Lock()
 BACKOFF_SECONDS = [60, 300, 1800]
@@ -55,7 +56,7 @@ def _mark_running(db: Session, job: Job | None) -> Job | None:
 
 def finish(db: Session, job: Job, status: str = "done", error: str = "") -> None:
     job.status = status
-    job.last_error = error[:2000]
+    job.last_error = redact(error)[:2000]
     job.locked_at = None
     db.commit()
 
@@ -67,7 +68,7 @@ def retry_or_fail(db: Session, job: Job, error: str) -> None:
     delay = BACKOFF_SECONDS[min(job.attempts - 1, len(BACKOFF_SECONDS) - 1)]
     job.status = "queued"
     job.run_after = now() + timedelta(seconds=delay)
-    job.last_error = error[:2000]
+    job.last_error = redact(error)[:2000]
     job.locked_at = None
     db.commit()
 
@@ -76,7 +77,7 @@ def postpone(db: Session, job: Job, until: datetime, reason: str) -> None:
     job.status = "queued"
     job.attempts = max(0, job.attempts - 1)  # postponement isn't a failed attempt
     job.run_after = until
-    job.last_error = reason
+    job.last_error = redact(reason)[:2000]
     job.locked_at = None
     db.commit()
 

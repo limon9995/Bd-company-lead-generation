@@ -11,6 +11,9 @@ from app.deps import LoginRequired
 from app.routers import auth, campaigns, leads, outbox, public, runs, settings
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+from app.redact import install_log_filter  # noqa: E402
+
+install_log_filter()
 
 
 def create_app() -> FastAPI:
