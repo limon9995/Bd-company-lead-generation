@@ -8,3 +8,6 @@ __pycache__/
 backups/
 data/
 .admin-created
+leadgen.db
+.vscode/
+ACCESS-INFO.txt
