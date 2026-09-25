@@ -43,18 +43,17 @@ def unsubscribe_url(token: str) -> str:
 
 
 def build_context(db: Session, lead: Lead) -> dict:
-    c, p = lead.company, lead.primary_person
-    first = ""
-    if p:
-        from app.services.normalize import person_key
+    from app.services.normalize import first_name, greeting_name
 
-        parts = person_key(p.full_name).split()
-        first = parts[0].title() if parts else ""
+    c, p = lead.company, lead.primary_person
+    first = first_name(p.full_name) if p else ""
+    greeting = greeting_name(p.full_name) if p else ""
     facts = "; ".join(filter(None, [
         c.category, f"rated {c.rating} on Google" if c.rating else "", c.address,
     ]))
     return {
         "company_name": c.name, "person_name": p.full_name if p else "", "first_name": first or "Sir/Madam",
+        "greeting_name": greeting or "Sir/Madam",
         "title": p.title if p else "", "city": c.city, "industry": c.industry_slug.replace("_", " "),
         "category": c.category, "sender_name": settings_store.get(db, "sender_name"),
         "sender_company": settings_store.get(db, "sender_company"), "facts": facts,

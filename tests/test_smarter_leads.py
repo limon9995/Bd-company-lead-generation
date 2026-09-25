@@ -63,6 +63,24 @@ def test_existing_duplicates_are_merged_and_leads_move_to_the_kept_person(db):
     assert db.get(Lead, lead.id).primary_person_id == a.id
 
 
+def test_greetings_are_formal_and_skip_initials_and_family_titles():
+    from app.services.normalize import first_name, greeting_name
+
+    cases = {
+        "Dr. A. M. Shamim": ("Shamim", "Dr. Shamim"),
+        "Professor Syed Ferhat Anwar": ("Ferhat", "Professor Anwar"),
+        "Emeritus Prof. Abdul Mannan Choudhury": ("Mannan", "Professor Choudhury"),
+        "Brig Gen Prof. Dr. Engr Md Lutfor Rahman (Retd)": ("Lutfor", "Professor Rahman"),
+        "Mr. Md. Shamsul Huda FCA": ("Shamsul", "Shamsul Huda"),
+        "MOHAMMED SHAMSUL ALAM": ("Shamsul", "Shamsul Alam"),
+        "Barrister Shameem Haider Patwary": ("Shameem", "Barrister Patwary"),
+        "Hasan Mahmood Raja": ("Hasan", "Hasan Mahmood Raja"),
+        "প্রফেসর মোঃ রহিম উদ্দিন": ("রহিম", "রহিম উদ্দিন"),
+    }
+    for name, (first, formal) in cases.items():
+        assert (first_name(name), greeting_name(name)) == (first, formal), name
+
+
 # ---------------------------------------------------------------- 3. better emails
 def test_company_address_format_is_learned_and_applied():
     known = [("Karim Ahmed", "karim.ahmed@acme.com.bd"), ("Nadia Islam", "nadia.islam@acme.com.bd")]

@@ -72,6 +72,46 @@ _BN_PERSON_HONORIFICS = re.compile(unicodedata.normalize(
     "NFKC", r"(^|\s)(মোঃ|মো\.|মোহাঃ|ড\.|ডঃ|ডা\.|ডাঃ|প্রফেসর|অধ্যাপক|প্রকৌশলী|জনাব|আলহাজ্ব|আলহাজ|হাজী)(?=\s|$)"))
 
 
+# Family titles / name prefixes that are not what a person is called ("Syed Ferhat Anwar" is not "Syed").
+_NAME_PREFIXES = {"syed", "sayed", "sayeed", "sheikh", "shaikh", "sk", "kazi", "quazi", "khondokar", "khandaker",
+                  "khondaker", "mir", "abdul", "abu", "al", "bin"}
+
+
+def _name_words(name: str) -> list[str]:
+    """Words of a name without honorifics, initials or brackets, in original case."""
+    words = re.sub(r"\([^)]*\)", " ", name or "").replace(".", ". ").split()
+    # a word is part of the name if it survives person_key on its own (honorifics, "FCA", "Dr." don't)
+    return [w.strip(".,") for w in words if len(w.strip(".,")) > 1 and person_key(w)]
+
+
+def first_name(name: str) -> str:
+    """What to call someone informally: skips honorifics, initials and family titles ("Dr. A. M. Shamim" ->
+    "Shamim", "Syed Ferhat Anwar" -> "Ferhat")."""
+    words = _name_words(name)
+    usable = [w for w in words if w.lower() not in _NAME_PREFIXES] or words
+    w = usable[0] if usable else ""
+    return w.title() if w.isupper() else w
+
+
+def greeting_name(name: str) -> str:
+    """Formal salutation used in Bangladeshi business email: "Professor Anwar", "Dr. Shamim", else the full
+    name without honorifics ("Hasan Mahmood Raja")."""
+    words = _name_words(name)
+    if not words:
+        return ""
+    words = [w.title() if w.isupper() else w for w in words]
+    low = (name or "").lower()
+    if re.search(r"\bprof(essor)?\b", low):
+        return f"Professor {words[-1]}"
+    if re.search(r"\bdr\b", low):
+        return f"Dr. {words[-1]}"
+    if re.search(r"\bbarrister\b", low):
+        return f"Barrister {words[-1]}"
+    if re.search(r"\bengr\b", low):
+        return f"Engr. {words[-1]}"
+    return " ".join(words)
+
+
 def person_key(name: str) -> str:
     s = unicodedata.normalize("NFKC", name or "").lower()
     s = _BN_PERSON_HONORIFICS.sub(" ", s)

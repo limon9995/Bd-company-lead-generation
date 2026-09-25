@@ -175,6 +175,7 @@ async def template_preview(request: Request, user: User = Depends(current_user),
         ctx, sample = build_context(db, lead), f"{lead.company.name} (lead #{lead.id})"
     else:
         ctx = {"company_name": "Example Diagnostic Centre", "person_name": "Rahim Uddin", "first_name": "Rahim",
+               "greeting_name": "Rahim Uddin",
                "title": "Managing Director", "city": "Dhaka", "industry": "healthcare", "category": "Diagnostic center",
                "sender_name": settings_store.get(db, "sender_name") or "Your Name",
                "sender_company": settings_store.get(db, "sender_company") or "Your Company"}

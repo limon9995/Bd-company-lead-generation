@@ -9,7 +9,7 @@ from app.models import EmailTemplate, IndustryPreset
 
 SEED_FILE = Path(__file__).parent / "seeds" / "industries.yaml"
 
-DEFAULT_TEMPLATE_BODY = """Dear {{first_name}},
+DEFAULT_TEMPLATE_BODY = """Dear {{greeting_name}},
 
 {{personal_line}}
 

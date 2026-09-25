@@ -9,7 +9,7 @@ from app.services.errors import ProviderError
 from app.services.llm import LLMProvider
 
 VAR = re.compile(r"\{\{\s*(\w+)\s*\}\}")
-TEMPLATE_VARS = ["company_name", "person_name", "first_name", "title", "city", "industry", "category",
+TEMPLATE_VARS = ["company_name", "person_name", "greeting_name", "first_name", "title", "city", "industry", "category",
                  "sender_name", "sender_company", "personal_line"]
 
 
